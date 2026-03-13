@@ -952,7 +952,7 @@ window.editResultImport = (raceId) => {
 
   const existing = state.results
     .filter(result => result.raceId === raceId)
-    .sort((a, b) => (parseInt(a.position, 10) || 99) - (parseInt(b.position, 10) || 99))
+    .sort((a, b) => (parseInt(a.position, 50) || 99) - (parseInt(b.position, 50) || 99))
     .map(item => `${item.position} ${item.riderName}`)
     .join("\n");
 
