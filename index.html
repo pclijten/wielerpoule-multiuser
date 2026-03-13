@@ -738,7 +738,6 @@ function renderScores() {
     }).join("");
   }
 
-  const tbody = $("my-results-tbody");
   const items = relevantResults();
 
   tbody.innerHTML = items.map(item => {
