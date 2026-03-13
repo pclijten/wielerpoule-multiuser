@@ -468,11 +468,14 @@ function sameRiderName(a, b) {
 function matchRiderInText(name, sourceText) {
   const text = ` ${normalizeText(sourceText)} `;
   const variants = parseNameVariants(name);
+
   return variants.some(parsed => {
     const firstOk = parsed.first.every(tok => text.includes(` ${tok} `));
     if (!firstOk) return false;
+
     const family = strongFamilyTokens(parsed.family);
     const foundFamily = family.filter(tok => text.includes(` ${tok} `)).length;
+
     return foundFamily >= Math.min(2, family.length);
   });
 }
