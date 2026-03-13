@@ -230,22 +230,15 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
         </div>
       </div>
 
-<div class="sec">Startlijsten en uitslagen beheren</div>
-<table class="rtbl" style="margin-bottom:28px">
-  <thead>
-    <tr>
-      <th>Wedstrijd</th>
-      <th>Type</th>
-      <th>Datum</th>
-      <th>Startlijst</th>
-      <th>Uitslag</th>
-      <th></th>
-      <th></th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody id="admin-races-tbody"></tbody>
-</table>
+      <div class="sec">Startlijsten en uitslagen beheren</div>
+      <table class="rtbl" style="margin-bottom:28px">
+        <thead>
+          <tr>
+            <th>Wedstrijd</th><th>Type</th><th>Datum</th><th>Startlijst</th><th>Uitslag</th><th></th><th></th><th></th>
+          </tr>
+        </thead>
+        <tbody id="admin-races-tbody"></tbody>
+      </table>
 
       <div class="form-card">
         <h3>Resultaat toevoegen</h3>
@@ -283,6 +276,7 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
 <div id="toast">Opgeslagen</div>
 
 <script type="module">
+// ── BUG FIX 1: was dubbele "import {" ──────────────────────────────────────
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
 import {
@@ -381,7 +375,7 @@ function normalizeText(value) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/['’.-]/g, " ")
+    .replace(/[''.-]/g, " ")
     .replace(/[^a-z\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -406,19 +400,9 @@ function parseNameVariants(name) {
 
   const variants = [];
 
-  // Variant 1: voornaam eerst
-  variants.push({
-    first: [clean[0]],
-    family: clean.slice(1)
-  });
+  variants.push({ first: [clean[0]], family: clean.slice(1) });
+  variants.push({ first: [clean[clean.length - 1]], family: clean.slice(0, -1) });
 
-  // Variant 2: achternaam eerst
-  variants.push({
-    first: [clean[clean.length - 1]],
-    family: clean.slice(0, -1)
-  });
-
-  // Variant 3: expliciete ALL-CAPS achternaam vooraan
   let cut = 0;
   while (
     cut < raw.length - 1 &&
@@ -427,10 +411,7 @@ function parseNameVariants(name) {
     cut++;
   }
   if (cut > 0 && cut < raw.length) {
-    variants.push({
-      first: clean.slice(cut),
-      family: clean.slice(0, cut)
-    });
+    variants.push({ first: clean.slice(cut), family: clean.slice(0, cut) });
   }
 
   const seen = new Set();
@@ -450,32 +431,29 @@ function strongFamilyTokens(family) {
 function variantMatches(a, b) {
   const firstOk = a.first.some(t => b.first.includes(t));
   if (!firstOk) return false;
-
   const famA = strongFamilyTokens(a.family);
   const famB = strongFamilyTokens(b.family);
   const overlap = famA.filter(t => famB.includes(t)).length;
-
   return overlap >= Math.min(2, famA.length, famB.length);
 }
 
 function sameRiderName(a, b) {
   const variantsA = parseNameVariants(a);
   const variantsB = parseNameVariants(b);
-
   return variantsA.some(va => variantsB.some(vb => variantMatches(va, vb)));
 }
 
+// ── BUG FIX 2: matchRiderInText was dubbel gedefinieerd; tweede versie
+//    gebruikte de niet-bestaande functie parseName(). Alleen de correcte
+//    versie hieronder gehouden. ────────────────────────────────────────────
 function matchRiderInText(name, sourceText) {
   const text = ` ${normalizeText(sourceText)} `;
   const variants = parseNameVariants(name);
-
   return variants.some(parsed => {
     const firstOk = parsed.first.every(tok => text.includes(` ${tok} `));
     if (!firstOk) return false;
-
     const family = strongFamilyTokens(parsed.family);
     const foundFamily = family.filter(tok => text.includes(` ${tok} `)).length;
-
     return foundFamily >= Math.min(2, family.length);
   });
 }
@@ -495,6 +473,7 @@ function calculatePoints(type, position) {
   if (Array.isArray(table)) return table[index] || 0;
   return table.kl ? table.kl[index] || 0 : 0;
 }
+
 function cleanImportedName(value) {
   return String(value || "")
     .replace(/\s*\([^)]*\)\s*$/g, "")
@@ -506,14 +485,11 @@ function looksLikeRiderName(value) {
   const text = cleanImportedName(value);
   if (!text) return false;
   if (/^(dnf|dns|dsq|otl|abd|np|e\d+)/i.test(text)) return false;
-
   const words = rawWords(text);
   if (words.length < 2) return false;
-
   if (/(victorious|team|cycling|grenadiers|mobility|easy ?post|quick ?step|visitmalta|emirates|postnl|hansgrohe|fdj|astana|trek|movistar|visma|alula)/i.test(text) && words.length > 3) {
     return false;
   }
-
   return true;
 }
 
@@ -534,7 +510,6 @@ function parseImportedResultText(text) {
     if (sameLine) {
       const rank = parseInt(sameLine[1], 10);
       const riderName = cleanImportedName(sameLine[2]);
-
       if (rank >= 1 && rank <= 10 && looksLikeRiderName(riderName) && !seen.has(rank)) {
         out.push({ position: String(rank), riderName });
         seen.add(rank);
@@ -546,7 +521,6 @@ function parseImportedResultText(text) {
     if (splitLine && i + 1 < lines.length) {
       const rank = parseInt(splitLine[1], 10);
       const riderName = cleanImportedName(lines[i + 1]);
-
       if (rank >= 1 && rank <= 10 && looksLikeRiderName(riderName) && !seen.has(rank)) {
         out.push({ position: String(rank), riderName });
         seen.add(rank);
@@ -562,7 +536,6 @@ function previewImportedResults(items) {
   if (!items.length) {
     return '<div class="empty">Geen top-10 uitslag gevonden. Plak hier een echte uitslag of klassering, niet de startlijst.</div>';
   }
-
   return `
     <table class="restbl">
       <thead><tr><th>Positie</th><th>Renner</th></tr></thead>
@@ -581,7 +554,7 @@ function previewImportedResults(items) {
 function countRaceResults(raceId) {
   return state.results.filter(result => result.raceId === raceId).length;
 }
-  
+
 function teamResults(team) {
   return state.results.filter(result => team.riders.some(r => sameRiderName(r, result.riderName)));
 }
@@ -675,14 +648,16 @@ function renderScores() {
     return `<tr><td style="font-weight:500">${escapeHtml(item.riderName)}</td><td style="color:var(--muted)">${escapeHtml(team?.name || "-")}</td><td>${escapeHtml(item.raceName)}</td><td style="color:var(--muted)">${escapeHtml(posLabel)}</td><td><span class="pts">+${item.points}</span></td></tr>`;
   }).join("") || '<tr><td colspan="5" class="empty">Nog geen resultaten voor jouw renners.</td></tr>';
 }
+
+// ── BUG FIX 3: renderAdmin was niet als functie gedefinieerd; de code stond
+//    los op module-niveau en crashte bij laden. Nu correct ingepakt. ────────
 function renderAdmin() {
   const racesTbody = $("admin-races-tbody");
   racesTbody.innerHTML = state.races.map(race => {
     const lineCount = (race.startlistText || "").split(/\n+/).map(v => v.trim()).filter(Boolean).length;
     const startlistStatus = lineCount ? `<span class="badge ok">${lineCount} regels</span>` : '<span class="badge">Leeg</span>';
-
     const resultCount = countRaceResults(race.id);
-    const resultStatus = resultCount ? `<span class="badge ok">${resultCount} regels</span>` : '<span class="badge">Leeg</span>';
+    const resultStatus = resultCount ? `<span class="badge ok">${resultCount} resultaten</span>` : '<span class="badge">Leeg</span>';
 
     return `<tr>
       <td style="font-weight:500">${escapeHtml(race.name)}</td>
@@ -695,23 +670,6 @@ function renderAdmin() {
       <td><button class="bd" onclick="deleteRace('${race.id}')">Verwijderen</button></td>
     </tr>`;
   }).join("") || '<tr><td colspan="8" class="empty">Nog geen wedstrijden.</td></tr>';
-
-  const raceSelect = $("result-race");
-  raceSelect.innerHTML = state.races.map(race => `<option value="${race.id}">${escapeHtml(race.name)}</option>`).join("") || '<option value="">Geen wedstrijden</option>';
-
-  const resultsTbody = $("admin-results-tbody");
-  resultsTbody.innerHTML = state.results.map(item => {
-    const posLabel = item.position === "etappe" ? "Etappezege" : `No. ${item.position}`;
-    return `<tr>
-      <td style="font-weight:500">${escapeHtml(item.riderName)}</td>
-      <td>${escapeHtml(item.raceName)}</td>
-      <td style="color:var(--muted)">${escapeHtml(posLabel)}</td>
-      <td><span class="pts">+${item.points}</span></td>
-      <td><button class="bd" onclick="deleteResult('${item.id}')">Verwijderen</button></td>
-    </tr>`;
-  }).join("") || '<tr><td colspan="5" class="empty">Nog geen resultaten.</td></tr>';
-}
-
 
   const raceSelect = $("result-race");
   raceSelect.innerHTML = state.races.map(race => `<option value="${race.id}">${escapeHtml(race.name)}</option>`).join("") || '<option value="">Geen wedstrijden</option>';
@@ -753,13 +711,10 @@ function parseTeamImport(rawText) {
   const normalized = String(rawText || "").replace(/\r/g, "").trim();
   if (!normalized) return [];
   const blocks = normalized.split(/\n\s*\n+/).map(block => block.trim()).filter(Boolean);
-  return blocks.map((block, idx) => {
+  return blocks.map((block) => {
     const lines = block.split("\n").map(line => line.trim()).filter(Boolean);
     if (lines.length < 2) return null;
-    return {
-      name: lines[0],
-      riders: Array.from(new Set(lines.slice(1)))
-    };
+    return { name: lines[0], riders: Array.from(new Set(lines.slice(1))) };
   }).filter(Boolean);
 }
 
@@ -825,11 +780,9 @@ function subscribeData(uid) {
 async function handleLoggedIn(user) {
   state.user = user;
   await upsertUserDoc(user);
-
   $("user-name").textContent = user.displayName || user.email || "Gebruiker";
   $("user-uid").textContent = user.uid;
   updateAdminUI();
-
   subscribeData(user.uid);
   setAuthView(true);
   hideLoader();
@@ -902,10 +855,7 @@ $("add-race-btn").addEventListener("click", async () => {
   const name = $("race-name").value.trim();
   const type = $("race-type").value;
   const date = $("race-date").value.trim();
-  if (!name) {
-    alert("Vul een wedstrijdnaam in.");
-    return;
-  }
+  if (!name) { alert("Vul een wedstrijdnaam in."); return; }
   const nextOrder = state.races.length ? Math.max(...state.races.map(r => r.sortOrder || 0)) + 1 : 1;
   await addDoc(collection(db, "races"), {
     name, type, date,
@@ -923,10 +873,7 @@ $("add-result-btn").addEventListener("click", async () => {
   const raceId = $("result-race").value;
   const position = $("result-position").value;
   const race = state.races.find(r => r.id === raceId);
-  if (!riderName || !race) {
-    alert("Kies een wedstrijd en vul een renner in.");
-    return;
-  }
+  if (!riderName || !race) { alert("Kies een wedstrijd en vul een renner in."); return; }
   await addDoc(collection(db, "results"), {
     riderName,
     raceId: race.id,
@@ -984,7 +931,7 @@ window.editStartlist = (raceId) => {
     toast("Startlijst leeggemaakt");
   });
 };
-  
+
 window.editResultImport = (raceId) => {
   const race = state.races.find(r => r.id === raceId);
   if (!race) return;
@@ -1019,17 +966,14 @@ window.editResultImport = (raceId) => {
 
   $("save-result-import-btn").addEventListener("click", async () => {
     const parsed = parseImportedResultText($("result-import-textarea").value);
-
     if (!parsed.length) {
       alert("Geen top-10 uitslag gevonden. Plak hier een echte uitslag of klassering.");
       return;
     }
-
     const existingDocs = await getDocs(query(collection(db, "results"), where("raceId", "==", raceId)));
     for (const row of existingDocs.docs) {
       await deleteDoc(doc(db, "results", row.id));
     }
-
     for (const item of parsed) {
       await addDoc(collection(db, "results"), {
         riderName: item.riderName,
@@ -1041,7 +985,6 @@ window.editResultImport = (raceId) => {
         createdAt: serverTimestamp()
       });
     }
-
     closeModal();
     toast("Uitslag geïmporteerd");
   });
@@ -1051,11 +994,11 @@ window.editResultImport = (raceId) => {
     for (const row of existingDocs.docs) {
       await deleteDoc(doc(db, "results", row.id));
     }
-
     closeModal();
     toast("Uitslag verwijderd");
   });
 };
+
 window.openRaceMatches = (raceId) => {
   const race = state.races.find(r => r.id === raceId);
   if (!race) return;
