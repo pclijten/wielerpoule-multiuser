@@ -26,7 +26,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 
 .auth-wrap{position:relative;z-index:2;min-height:100vh;display:grid;place-items:center;padding:32px}
 .auth-card{width:min(560px,100%);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:32px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
-.auth-logo{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:3px;line-height:1;color:var(--accent);margin-bottom:20px}
+.auth-logo{font-family:'Bebas Neue',sans-serif;font-size:52px;color:var(--accent);letter-spacing:3px;line-height:1;margin-bottom:20px}
 .auth-logo span{color:var(--text);font-size:24px;display:block;letter-spacing:8px;margin-bottom:6px}
 .auth-card h1{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;color:var(--accent);margin-bottom:10px}
 .auth-card p{color:var(--muted);line-height:1.6;margin-bottom:20px}
@@ -231,35 +231,30 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
       </div>
 
       <div class="sec">Startlijsten, eindklassement en etappes</div>
-<table class="rtbl" style="margin-bottom:28px">
-  <thead>
-    <tr>
-      <th>Wedstrijd</th>
-      <th>Type</th>
-      <th>Datum</th>
-      <th>Startlijst</th>
-      <th>Eindklassement</th>
-      <th>Etappes</th>
-      <th></th>
-      <th></th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody id="admin-races-tbody"></tbody>
-</table>
-      
+      <table class="rtbl" style="margin-bottom:28px">
+        <thead>
+          <tr>
+            <th>Wedstrijd</th>
+            <th>Type</th>
+            <th>Datum</th>
+            <th>Startlijst</th>
+            <th>Eindklassement</th>
+            <th>Etappes</th>
+            <th></th>
+            <th></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="admin-races-tbody"></tbody>
+      </table>
+
       <div class="form-card">
         <h3>Resultaat toevoegen</h3>
         <div class="frow">
           <div class="fg"><label>Renner</label><input id="result-rider" placeholder="Bijv. Mathieu van der Poel"></div>
           <div class="fg"><label>Wedstrijd</label><select id="result-race"></select></div>
           <div class="fg"><label>Positie</label>
-            <select id="result-position">
-              <option value="1">1e plaats</option><option value="2">2e plaats</option><option value="3">3e plaats</option>
-              <option value="4">4e plaats</option><option value="5">5e plaats</option><option value="6">6e plaats</option>
-              <option value="7">7e plaats</option><option value="8">8e plaats</option><option value="9">9e plaats</option>
-              <option value="10">10e plaats</option><option value="etappe">Etappezege</option>
-            </select>
+            <select id="result-position"></select>
           </div>
           <button class="bp" id="add-result-btn">Opslaan</button>
         </div>
@@ -284,11 +279,10 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
 <div id="toast">Opgeslagen</div>
 
 <script type="module">
-// ── BUG FIX 1: was dubbele "import {" ──────────────────────────────────────
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
 import {
-  getFirestore, doc, setDoc, getDoc, addDoc, updateDoc, deleteDoc,
+  getFirestore, doc, setDoc, addDoc, updateDoc, deleteDoc,
   collection, onSnapshot, query, orderBy, serverTimestamp, getDocs, where
 } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
 
@@ -333,12 +327,8 @@ const DEFAULT_RACES = [
 ];
 
 const POINTS_TABLE = {
-  Eendaagse: {
-    final: [200,161,136,116,101,87,76,65,56,47,39,32,25,18,12]
-  },
-  Monument: {
-    final: [300,241,203,173,149,129,111,96,81,68,56,45,34,24,15]
-  },
+  Eendaagse: { final: [200,161,136,116,101,87,76,65,56,47,39,32,25,18,12] },
+  Monument: { final: [300,241,203,173,149,129,111,96,81,68,56,45,34,24,15] },
   Rittenkoers: {
     final: [250,207,179,157,140,125,112,100,90,80,72,63,56,48,42,35,29,23,17,12],
     stage: [70,50,35,20,15]
@@ -347,53 +337,9 @@ const POINTS_TABLE = {
     final: [450,372,321,283,251,224,201,180,161,143,128,113,99,86,73,62,51,40,30,20],
     stage: [70,50,35,20,15]
   },
-  Divers: {
-    final: [250,189,149,119,94,73,55,38,24,10]
-  }
+  Divers: { final: [250,189,149,119,94,73,55,38,24,10] }
 };
 
-function isStageRace(type) {
-  return type === "Rittenkoers" || type === "Grote Ronde";
-}
-
-function getMaxFinalPositions(type) {
-  return POINTS_TABLE[type]?.final?.length || 10;
-}
-
-function getMaxStagePositions(type) {
-  return POINTS_TABLE[type]?.stage?.length || 0;
-}
-
-function buildPositionOptions() {
-  const select = $("result-position");
-  if (!select) return;
-
-  select.innerHTML = Array.from({ length: 20 }, (_, i) => {
-    const pos = i + 1;
-    return `<option value="${pos}">${pos}e plaats</option>`;
-  }).join("");
-}
-
-function getResultKind(result) {
-  return result.resultKind || "final";
-}
-
-function getResultLabel(result) {
-  const kind = getResultKind(result);
-  if (kind === "stage") {
-    return `${result.raceName} - etappe ${result.stageNumber}`;
-  }
-  return `${result.raceName} - eindklassement`;
-}
-
-function getPositionLabel(result) {
-  const kind = getResultKind(result);
-  if (kind === "stage") {
-    return `Etappe ${result.stageNumber} - no. ${result.position}`;
-  }
-  return `No. ${result.position}`;
-}
-  
 const FAMILY_PARTICLES = new Set(["van","der","den","de","del","della","di","da","dos","du","la","le","el"]);
 
 const app = initializeApp(firebaseConfig);
@@ -417,11 +363,13 @@ const toast = (msg = "Opgeslagen") => {
   t.classList.add("show");
   setTimeout(() => t.classList.remove("show"), 2200);
 };
+
 const hideLoader = () => {
   const el = $("loader");
   el.classList.add("hidden");
-  setTimeout(() => el.style.display = "none", 350);
+  setTimeout(() => { el.style.display = "none"; }, 350);
 };
+
 const cleanupListeners = () => {
   state.unsubs.forEach(fn => fn && fn());
   state.unsubs = [];
@@ -437,7 +385,7 @@ function normalizeText(value) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[''.-]/g, " ")
+    .replace(/['’.-]/g, " ")
     .replace(/[^a-z\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -461,7 +409,6 @@ function parseNameVariants(name) {
   if (clean.length < 2) return [{ first: clean, family: clean }];
 
   const variants = [];
-
   variants.push({ first: [clean[0]], family: clean.slice(1) });
   variants.push({ first: [clean[clean.length - 1]], family: clean.slice(0, -1) });
 
@@ -472,8 +419,12 @@ function parseNameVariants(name) {
   ) {
     cut++;
   }
+
   if (cut > 0 && cut < raw.length) {
-    variants.push({ first: clean.slice(cut), family: clean.slice(0, cut) });
+    variants.push({
+      first: clean.slice(cut),
+      family: clean.slice(0, cut)
+    });
   }
 
   const seen = new Set();
@@ -505,12 +456,10 @@ function sameRiderName(a, b) {
   return variantsA.some(va => variantsB.some(vb => variantMatches(va, vb)));
 }
 
-// ── BUG FIX 2: matchRiderInText was dubbel gedefinieerd; tweede versie
-//    gebruikte de niet-bestaande functie parseName(). Alleen de correcte
-//    versie hieronder gehouden. ────────────────────────────────────────────
 function matchRiderInText(name, sourceText) {
   const text = ` ${normalizeText(sourceText)} `;
   const variants = parseNameVariants(name);
+
   return variants.some(parsed => {
     const firstOk = parsed.first.every(tok => text.includes(` ${tok} `));
     if (!firstOk) return false;
@@ -518,6 +467,27 @@ function matchRiderInText(name, sourceText) {
     const foundFamily = family.filter(tok => text.includes(` ${tok} `)).length;
     return foundFamily >= Math.min(2, family.length);
   });
+}
+
+function isStageRace(type) {
+  return type === "Rittenkoers" || type === "Grote Ronde";
+}
+
+function getMaxFinalPositions(type) {
+  return POINTS_TABLE[type]?.final?.length || 10;
+}
+
+function getMaxStagePositions(type) {
+  return POINTS_TABLE[type]?.stage?.length || 0;
+}
+
+function buildPositionOptions() {
+  const select = $("result-position");
+  if (!select) return;
+  select.innerHTML = Array.from({ length: 20 }, (_, i) => {
+    const pos = i + 1;
+    return `<option value="${pos}">${pos}e plaats</option>`;
+  }).join("");
 }
 
 function getRaceCss(type) {
@@ -577,7 +547,6 @@ function parseImportedPositions(text, maxPositions) {
     if (sameLine) {
       const rank = parseInt(sameLine[1], 10);
       const riderName = cleanImportedName(sameLine[2]);
-
       if (rank >= 1 && rank <= maxPositions && looksLikeRiderName(riderName) && !seen.has(rank)) {
         out.push({ position: String(rank), riderName });
         seen.add(rank);
@@ -589,7 +558,6 @@ function parseImportedPositions(text, maxPositions) {
     if (splitLine && i + 1 < lines.length) {
       const rank = parseInt(splitLine[1], 10);
       const riderName = cleanImportedName(lines[i + 1]);
-
       if (rank >= 1 && rank <= maxPositions && looksLikeRiderName(riderName) && !seen.has(rank)) {
         out.push({ position: String(rank), riderName });
         seen.add(rank);
@@ -619,6 +587,26 @@ function previewImportedResults(items) {
       </tbody>
     </table>
   `;
+}
+
+function getResultKind(result) {
+  return result.resultKind || "final";
+}
+
+function getResultLabel(result) {
+  const kind = getResultKind(result);
+  if (kind === "stage") {
+    return `${result.raceName} - etappe ${result.stageNumber}`;
+  }
+  return `${result.raceName} - eindklassement`;
+}
+
+function getPositionLabel(result) {
+  const kind = getResultKind(result);
+  if (kind === "stage") {
+    return `Etappe ${result.stageNumber} - no. ${result.position}`;
+  }
+  return `No. ${result.position}`;
 }
 
 function countRaceResults(raceId, resultKind = "all") {
@@ -681,12 +669,17 @@ function renderTeams() {
     grid.innerHTML = '<div class="card" style="grid-column:1/-1"><div class="empty">Je hebt nog geen teams geïmporteerd.</div></div>';
     return;
   }
+
   grid.innerHTML = state.teams.map((team, index) => {
     const cls = ["t1","t2","t3"][index % 3] || "t1";
     const ridersHtml = team.riders.map(rider => {
-      const points = state.results.filter(result => sameRiderName(result.riderName, rider)).reduce((sum, item) => sum + (item.points || 0), 0);
+      const points = state.results
+        .filter(result => sameRiderName(result.riderName, rider))
+        .reduce((sum, item) => sum + (item.points || 0), 0);
+
       return `<div class="rrow"><span class="rname">${escapeHtml(rider)}</span><span class="rpts">${points || ""}</span></div>`;
     }).join("");
+
     return `
       <div class="card">
         <div class="thead ${cls}"><span>${escapeHtml(team.name)}</span><span class="tpts">${totalTeamPoints(team)} pts</span></div>
@@ -703,6 +696,7 @@ function renderRaces() {
     const matches = raceMatchesForUser(race);
     const startlistStatus = race.startlistText ? '<span class="badge ok">Ingevuld</span>' : '<span class="badge">Leeg</span>';
     const mine = matches.length ? `<span class="badge ok">${matches.length}</span>` : '<span class="badge">0</span>';
+
     return `
       <tr class="crow" onclick="openRaceMatches('${race.id}')">
         <td style="color:var(--muted);font-size:12px">${index + 1}</td>
@@ -738,6 +732,7 @@ function renderScores() {
     }).join("");
   }
 
+  const tbody = $("my-results-tbody");
   const items = relevantResults();
 
   tbody.innerHTML = items.map(item => {
@@ -754,17 +749,6 @@ function renderScores() {
   }).join("") || '<tr><td colspan="5" class="empty">Nog geen resultaten voor jouw renners.</td></tr>';
 }
 
-  const tbody = $("my-results-tbody");
-  const items = relevantResults();
-  tbody.innerHTML = items.map(item => {
-    const team = state.teams.find(t => t.riders.some(r => sameRiderName(r, item.riderName)));
-    const posLabel = item.position === "etappe" ? "Etappezege" : `No. ${item.position}`;
-    return `<tr><td style="font-weight:500">${escapeHtml(item.riderName)}</td><td style="color:var(--muted)">${escapeHtml(team?.name || "-")}</td><td>${escapeHtml(item.raceName)}</td><td style="color:var(--muted)">${escapeHtml(posLabel)}</td><td><span class="pts">+${item.points}</span></td></tr>`;
-  }).join("") || '<tr><td colspan="5" class="empty">Nog geen resultaten voor jouw renners.</td></tr>';
-}
-
-// ── BUG FIX 3: renderAdmin was niet als functie gedefinieerd; de code stond
-//    los op module-niveau en crashte bij laden. Nu correct ingepakt. ────────
 function renderAdmin() {
   const racesTbody = $("admin-races-tbody");
 
@@ -792,9 +776,7 @@ function renderAdmin() {
   }).join("") || '<tr><td colspan="9" class="empty">Nog geen wedstrijden.</td></tr>';
 
   const raceSelect = $("result-race");
-  raceSelect.innerHTML = state.races
-    .map(race => `<option value="${race.id}">${escapeHtml(race.name)}</option>`)
-    .join("") || '<option value="">Geen wedstrijden</option>';
+  raceSelect.innerHTML = state.races.map(race => `<option value="${race.id}">${escapeHtml(race.name)}</option>`).join("") || '<option value="">Geen wedstrijden</option>';
 
   const resultsTbody = $("admin-results-tbody");
   resultsTbody.innerHTML = state.results.map(item => {
@@ -840,6 +822,7 @@ function parseTeamImport(rawText) {
   const normalized = String(rawText || "").replace(/\r/g, "").trim();
   if (!normalized) return [];
   const blocks = normalized.split(/\n\s*\n+/).map(block => block.trim()).filter(Boolean);
+
   return blocks.map((block) => {
     const lines = block.split("\n").map(line => line.trim()).filter(Boolean);
     if (lines.length < 2) return null;
@@ -871,6 +854,7 @@ async function seedDefaultRaces() {
     toast("Kalender bestaat al");
     return;
   }
+
   for (const race of DEFAULT_RACES) {
     await addDoc(collection(db, "races"), {
       ...race,
@@ -878,6 +862,7 @@ async function seedDefaultRaces() {
       createdAt: serverTimestamp()
     });
   }
+
   toast("Standaardkalender geladen");
 }
 
@@ -891,7 +876,8 @@ function subscribeData(uid) {
   }));
 
   state.unsubs.push(onSnapshot(query(collection(db, "users", uid, "teams")), snap => {
-    state.teams = snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() })).sort((a,b) => (a.name || "").localeCompare(b.name || ""));
+    state.teams = snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
+      .sort((a,b) => (a.name || "").localeCompare(b.name || ""));
     renderAll();
   }));
 
@@ -909,8 +895,10 @@ function subscribeData(uid) {
 async function handleLoggedIn(user) {
   state.user = user;
   await upsertUserDoc(user);
+
   $("user-name").textContent = user.displayName || user.email || "Gebruiker";
   $("user-uid").textContent = user.uid;
+
   updateAdminUI();
   subscribeData(user.uid);
   setAuthView(true);
@@ -942,7 +930,9 @@ $("logout-btn").addEventListener("click", async () => {
 });
 
 $("modal-close").addEventListener("click", closeModal);
-$("modal").addEventListener("click", (e) => { if (e.target === $("modal")) closeModal(); });
+$("modal").addEventListener("click", (e) => {
+  if (e.target === $("modal")) closeModal();
+});
 
 document.querySelectorAll("nav button[data-tab]").forEach(btn => {
   btn.addEventListener("click", () => showTab(btn.dataset.tab));
@@ -957,12 +947,14 @@ $("import-teams-btn").addEventListener("click", () => {
       <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="bp" id="save-teams-import-btn">Importeren</button></div>
     </div>
   `);
+
   $("save-teams-import-btn").addEventListener("click", async () => {
     const parsed = parseTeamImport($("teams-import-text").value);
     if (!parsed.length) {
       alert("Geen geldige teams gevonden. Gebruik het formaat: teamnaam + renners, met een lege regel tussen teams.");
       return;
     }
+
     for (const team of parsed) {
       await addDoc(collection(db, "users", state.user.uid, "teams"), {
         name: team.name,
@@ -970,6 +962,7 @@ $("import-teams-btn").addEventListener("click", () => {
         createdAt: serverTimestamp()
       });
     }
+
     closeModal();
     toast("Teams geïmporteerd");
   });
@@ -984,14 +977,21 @@ $("add-race-btn").addEventListener("click", async () => {
   const name = $("race-name").value.trim();
   const type = $("race-type").value;
   const date = $("race-date").value.trim();
-  if (!name) { alert("Vul een wedstrijdnaam in."); return; }
+
+  if (!name) {
+    alert("Vul een wedstrijdnaam in.");
+    return;
+  }
+
   const nextOrder = state.races.length ? Math.max(...state.races.map(r => r.sortOrder || 0)) + 1 : 1;
+
   await addDoc(collection(db, "races"), {
     name, type, date,
     sortOrder: nextOrder,
     startlistText: "",
     createdAt: serverTimestamp()
   });
+
   $("race-name").value = "";
   $("race-date").value = "";
   toast("Wedstrijd toegevoegd");
@@ -1024,6 +1024,7 @@ $("add-result-btn").addEventListener("click", async () => {
   $("result-position").value = "1";
   toast("Resultaat opgeslagen");
 });
+
 window.deleteTeam = async (teamId) => {
   if (!confirm("Team verwijderen?")) return;
   await deleteDoc(doc(db, "users", state.user.uid, "teams", teamId));
@@ -1045,6 +1046,7 @@ window.deleteResult = async (resultId) => {
 window.editStartlist = (raceId) => {
   const race = state.races.find(r => r.id === raceId);
   if (!race) return;
+
   openModal(`Startlijst: ${escapeHtml(race.name)}`, `
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="helper">Plak hier de volledige deelnemerslijst. Teamnamen, rugnummers, DNS-regels en extra tekst mogen blijven staan. De app filtert automatisch de renners van elke gebruiker.</div>
@@ -1055,20 +1057,22 @@ window.editStartlist = (raceId) => {
       </div>
     </div>
   `);
+
   $("startlist-textarea").value = race.startlistText || "";
+
   $("save-startlist-btn").addEventListener("click", async () => {
     await updateDoc(doc(db, "races", raceId), { startlistText: $("startlist-textarea").value });
     closeModal();
     toast("Startlijst opgeslagen");
   });
+
   $("clear-startlist-btn").addEventListener("click", async () => {
     await updateDoc(doc(db, "races", raceId), { startlistText: "" });
     closeModal();
     toast("Startlijst leeggemaakt");
   });
 };
-
-window.editResultImport = (raceId) => {
+  window.editResultImport = (raceId) => {
   const race = state.races.find(r => r.id === raceId);
   if (!race) return;
 
@@ -1268,6 +1272,7 @@ window.editStageImport = (raceId) => {
 window.openRaceMatches = (raceId) => {
   const race = state.races.find(r => r.id === raceId);
   if (!race) return;
+
   if (!race.startlistText) {
     openModal(`Starters: ${escapeHtml(race.name)}`, '<div class="empty">Er is nog geen startlijst ingevuld voor deze wedstrijd.</div>');
     return;
@@ -1284,6 +1289,7 @@ window.openRaceMatches = (raceId) => {
   });
 
   let html = '<div class="helper" style="margin-bottom:14px">Alleen renners uit jouw eigen teams worden hieronder getoond.</div>';
+
   if (!matches.length) {
     html += '<div class="empty">Geen van jouw renners staat op deze startlijst.</div>';
   } else {
@@ -1294,10 +1300,12 @@ window.openRaceMatches = (raceId) => {
     });
     html += '</div>';
   }
+
   openModal(`Starters: ${escapeHtml(race.name)}`, html);
 };
+
 buildPositionOptions();
-  
+
 onAuthStateChanged(auth, async (user) => {
   try {
     if (user) await handleLoggedIn(user);
