@@ -1297,7 +1297,8 @@ window.openRaceMatches = (raceId) => {
   }
   openModal(`Starters: ${escapeHtml(race.name)}`, html);
 };
-
+buildPositionOptions();
+  
 onAuthStateChanged(auth, async (user) => {
   try {
     if (user) await handleLoggedIn(user);
