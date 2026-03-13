@@ -230,16 +230,24 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
         </div>
       </div>
 
-      <div class="sec">Startlijsten en uitslagen beheren</div>
-      <table class="rtbl" style="margin-bottom:28px">
-        <thead>
-          <tr>
-            <th>Wedstrijd</th><th>Type</th><th>Datum</th><th>Startlijst</th><th>Uitslag</th><th></th><th></th><th></th>
-          </tr>
-        </thead>
-        <tbody id="admin-races-tbody"></tbody>
-      </table>
-
+      <div class="sec">Startlijsten, eindklassement en etappes</div>
+<table class="rtbl" style="margin-bottom:28px">
+  <thead>
+    <tr>
+      <th>Wedstrijd</th>
+      <th>Type</th>
+      <th>Datum</th>
+      <th>Startlijst</th>
+      <th>Eindklassement</th>
+      <th>Etappes</th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody id="admin-races-tbody"></tbody>
+</table>
+      
       <div class="form-card">
         <h3>Resultaat toevoegen</h3>
         <div class="frow">
@@ -325,13 +333,67 @@ const DEFAULT_RACES = [
 ];
 
 const POINTS_TABLE = {
-  Eendaagse:[200,161,136,116,101,87,76,65,56,47],
-  Monument:[300,241,203,173,149,129,111,96,81,68],
-  Rittenkoers:{kl:[250,207,179,157,140,125,112,100,90,80],et:70},
-  "Grote Ronde":{kl:[450,372,321,283,251,224,201,180,161,143],et:70},
-  Divers:[250,189,149,119,94,73,55,38,24,10]
+  Eendaagse: {
+    final: [200,161,136,116,101,87,76,65,56,47,39,32,25,18,12]
+  },
+  Monument: {
+    final: [300,241,203,173,149,129,111,96,81,68,56,45,34,24,15]
+  },
+  Rittenkoers: {
+    final: [250,207,179,157,140,125,112,100,90,80,72,63,56,48,42,35,29,23,17,12],
+    stage: [70,50,35,20,15]
+  },
+  "Grote Ronde": {
+    final: [450,372,321,283,251,224,201,180,161,143,128,113,99,86,73,62,51,40,30,20],
+    stage: [70,50,35,20,15]
+  },
+  Divers: {
+    final: [250,189,149,119,94,73,55,38,24,10]
+  }
 };
 
+function isStageRace(type) {
+  return type === "Rittenkoers" || type === "Grote Ronde";
+}
+
+function getMaxFinalPositions(type) {
+  return POINTS_TABLE[type]?.final?.length || 10;
+}
+
+function getMaxStagePositions(type) {
+  return POINTS_TABLE[type]?.stage?.length || 0;
+}
+
+function buildPositionOptions() {
+  const select = $("result-position");
+  if (!select) return;
+
+  select.innerHTML = Array.from({ length: 20 }, (_, i) => {
+    const pos = i + 1;
+    return `<option value="${pos}">${pos}e plaats</option>`;
+  }).join("");
+}
+
+function getResultKind(result) {
+  return result.resultKind || "final";
+}
+
+function getResultLabel(result) {
+  const kind = getResultKind(result);
+  if (kind === "stage") {
+    return `${result.raceName} - etappe ${result.stageNumber}`;
+  }
+  return `${result.raceName} - eindklassement`;
+}
+
+function getPositionLabel(result) {
+  const kind = getResultKind(result);
+  if (kind === "stage") {
+    return `Etappe ${result.stageNumber} - no. ${result.position}`;
+  }
+  return `No. ${result.position}`;
+}
+  
 const FAMILY_PARTICLES = new Set(["van","der","den","de","del","della","di","da","dos","du","la","le","el"]);
 
 const app = initializeApp(firebaseConfig);
@@ -462,16 +524,18 @@ function getRaceCss(type) {
   return {Monument:"monument","Grote Ronde":"grande",Rittenkoers:"rit",Divers:"divers"}[type] || "";
 }
 
-function calculatePoints(type, position) {
-  if (position === "etappe") {
-    const table = POINTS_TABLE[type];
-    return table && table.et ? table.et : 0;
-  }
-  const index = parseInt(position, 10) - 1;
+function calculatePoints(type, position, resultKind = "final") {
   const table = POINTS_TABLE[type];
   if (!table) return 0;
-  if (Array.isArray(table)) return table[index] || 0;
-  return table.kl ? table.kl[index] || 0 : 0;
+
+  const index = parseInt(position, 10) - 1;
+  if (Number.isNaN(index) || index < 0) return 0;
+
+  if (resultKind === "stage") {
+    return table.stage?.[index] || 0;
+  }
+
+  return table.final?.[index] || 0;
 }
 
 function cleanImportedName(value) {
@@ -485,15 +549,18 @@ function looksLikeRiderName(value) {
   const text = cleanImportedName(value);
   if (!text) return false;
   if (/^(dnf|dns|dsq|otl|abd|np|e\d+)/i.test(text)) return false;
+
   const words = rawWords(text);
   if (words.length < 2) return false;
+
   if (/(victorious|team|cycling|grenadiers|mobility|easy ?post|quick ?step|visitmalta|emirates|postnl|hansgrohe|fdj|astana|trek|movistar|visma|alula)/i.test(text) && words.length > 3) {
     return false;
   }
+
   return true;
 }
 
-function parseImportedResultText(text) {
+function parseImportedPositions(text, maxPositions) {
   const lines = String(text || "")
     .replace(/\r/g, "")
     .split("\n")
@@ -510,7 +577,8 @@ function parseImportedResultText(text) {
     if (sameLine) {
       const rank = parseInt(sameLine[1], 10);
       const riderName = cleanImportedName(sameLine[2]);
-      if (rank >= 1 && rank <= 10 && looksLikeRiderName(riderName) && !seen.has(rank)) {
+
+      if (rank >= 1 && rank <= maxPositions && looksLikeRiderName(riderName) && !seen.has(rank)) {
         out.push({ position: String(rank), riderName });
         seen.add(rank);
         continue;
@@ -521,7 +589,8 @@ function parseImportedResultText(text) {
     if (splitLine && i + 1 < lines.length) {
       const rank = parseInt(splitLine[1], 10);
       const riderName = cleanImportedName(lines[i + 1]);
-      if (rank >= 1 && rank <= 10 && looksLikeRiderName(riderName) && !seen.has(rank)) {
+
+      if (rank >= 1 && rank <= maxPositions && looksLikeRiderName(riderName) && !seen.has(rank)) {
         out.push({ position: String(rank), riderName });
         seen.add(rank);
         i += 1;
@@ -534,8 +603,9 @@ function parseImportedResultText(text) {
 
 function previewImportedResults(items) {
   if (!items.length) {
-    return '<div class="empty">Geen top-10 uitslag gevonden. Plak hier een echte uitslag of klassering, niet de startlijst.</div>';
+    return '<div class="empty">Geen geldige uitslag gevonden.</div>';
   }
+
   return `
     <table class="restbl">
       <thead><tr><th>Positie</th><th>Renner</th></tr></thead>
@@ -551,8 +621,27 @@ function previewImportedResults(items) {
   `;
 }
 
-function countRaceResults(raceId) {
-  return state.results.filter(result => result.raceId === raceId).length;
+function countRaceResults(raceId, resultKind = "all") {
+  const items = state.results.filter(result => result.raceId === raceId);
+
+  if (resultKind === "final") {
+    return items.filter(result => getResultKind(result) === "final").length;
+  }
+
+  if (resultKind === "stage") {
+    return items.filter(result => getResultKind(result) === "stage").length;
+  }
+
+  return items.length;
+}
+
+function countRaceStages(raceId) {
+  return new Set(
+    state.results
+      .filter(result => result.raceId === raceId && getResultKind(result) === "stage")
+      .map(result => Number(result.stageNumber))
+      .filter(Boolean)
+  ).size;
 }
 
 function teamResults(team) {
@@ -628,17 +717,43 @@ function renderRaces() {
 
 function renderScores() {
   const board = $("scoreboard");
+
   if (!state.teams.length) {
     board.innerHTML = '<div class="card" style="grid-column:1/-1"><div class="empty">Importeer eerst je teams.</div></div>';
   } else {
     board.innerHTML = state.teams.map((team, index) => {
       const cls = ["t1","t2","t3"][index % 3] || "t1";
       const grouped = {};
-      teamResults(team).forEach(item => grouped[item.raceName] = (grouped[item.raceName] || 0) + (item.points || 0));
-      const body = Object.entries(grouped).map(([raceName, points]) => `<div class="sr"><span>${escapeHtml(raceName)}</span><strong>${points}</strong></div>`).join("") || '<div class="sr" style="justify-content:center">Nog geen punten</div>';
+
+      teamResults(team).forEach(item => {
+        const key = getResultLabel(item);
+        grouped[key] = (grouped[key] || 0) + (item.points || 0);
+      });
+
+      const body = Object.entries(grouped)
+        .map(([label, points]) => `<div class="sr"><span>${escapeHtml(label)}</span><strong>${points}</strong></div>`)
+        .join("") || '<div class="sr" style="justify-content:center">Nog geen punten</div>';
+
       return `<div class="card"><div class="sch ${cls}"><span>${escapeHtml(team.name)}</span><span class="sct">${totalTeamPoints(team)}</span></div><div class="scb">${body}</div></div>`;
     }).join("");
   }
+
+  const tbody = $("my-results-tbody");
+  const items = relevantResults();
+
+  tbody.innerHTML = items.map(item => {
+    const team = state.teams.find(t => t.riders.some(r => sameRiderName(r, item.riderName)));
+    return `
+      <tr>
+        <td style="font-weight:500">${escapeHtml(item.riderName)}</td>
+        <td style="color:var(--muted)">${escapeHtml(team?.name || "-")}</td>
+        <td>${escapeHtml(getResultLabel(item))}</td>
+        <td style="color:var(--muted)">${escapeHtml(getPositionLabel(item))}</td>
+        <td><span class="pts">+${item.points}</span></td>
+      </tr>
+    `;
+  }).join("") || '<tr><td colspan="5" class="empty">Nog geen resultaten voor jouw renners.</td></tr>';
+}
 
   const tbody = $("my-results-tbody");
   const items = relevantResults();
@@ -653,31 +768,46 @@ function renderScores() {
 //    los op module-niveau en crashte bij laden. Nu correct ingepakt. ────────
 function renderAdmin() {
   const racesTbody = $("admin-races-tbody");
+
   racesTbody.innerHTML = state.races.map(race => {
     const lineCount = (race.startlistText || "").split(/\n+/).map(v => v.trim()).filter(Boolean).length;
     const startlistStatus = lineCount ? `<span class="badge ok">${lineCount} regels</span>` : '<span class="badge">Leeg</span>';
-    const resultCount = countRaceResults(race.id);
-    const resultStatus = resultCount ? `<span class="badge ok">${resultCount} resultaten</span>` : '<span class="badge">Leeg</span>';
+
+    const finalCount = countRaceResults(race.id, "final");
+    const finalStatus = finalCount ? `<span class="badge ok">${finalCount} regels</span>` : '<span class="badge">Leeg</span>';
+
+    const stageCount = countRaceStages(race.id);
+    const stageStatus = stageCount ? `<span class="badge ok">${stageCount} etappes</span>` : '<span class="badge">Leeg</span>';
 
     return `<tr>
       <td style="font-weight:500">${escapeHtml(race.name)}</td>
       <td><span class="rt ${getRaceCss(race.type)}">${escapeHtml(race.type)}</span></td>
       <td style="color:var(--muted);font-size:12px">${escapeHtml(race.date || "")}</td>
       <td>${startlistStatus}</td>
-      <td>${resultStatus}</td>
+      <td>${finalStatus}</td>
+      <td>${stageStatus}</td>
       <td><button class="bx" onclick="editStartlist('${race.id}')">Startlijst</button></td>
-      <td><button class="bx" onclick="editResultImport('${race.id}')">Uitslag</button></td>
-      <td><button class="bd" onclick="deleteRace('${race.id}')">Verwijderen</button></td>
+      <td><button class="bx" onclick="editResultImport('${race.id}')">Eindklassement</button></td>
+      <td><button class="bx" onclick="editStageImport('${race.id}')">Etappe</button></td>
     </tr>`;
-  }).join("") || '<tr><td colspan="8" class="empty">Nog geen wedstrijden.</td></tr>';
+  }).join("") || '<tr><td colspan="9" class="empty">Nog geen wedstrijden.</td></tr>';
 
   const raceSelect = $("result-race");
-  raceSelect.innerHTML = state.races.map(race => `<option value="${race.id}">${escapeHtml(race.name)}</option>`).join("") || '<option value="">Geen wedstrijden</option>';
+  raceSelect.innerHTML = state.races
+    .map(race => `<option value="${race.id}">${escapeHtml(race.name)}</option>`)
+    .join("") || '<option value="">Geen wedstrijden</option>';
 
   const resultsTbody = $("admin-results-tbody");
   resultsTbody.innerHTML = state.results.map(item => {
-    const posLabel = item.position === "etappe" ? "Etappezege" : `No. ${item.position}`;
-    return `<tr><td style="font-weight:500">${escapeHtml(item.riderName)}</td><td>${escapeHtml(item.raceName)}</td><td style="color:var(--muted)">${escapeHtml(posLabel)}</td><td><span class="pts">+${item.points}</span></td><td><button class="bd" onclick="deleteResult('${item.id}')">Verwijderen</button></td></tr>`;
+    return `
+      <tr>
+        <td style="font-weight:500">${escapeHtml(item.riderName)}</td>
+        <td>${escapeHtml(getResultLabel(item))}</td>
+        <td style="color:var(--muted)">${escapeHtml(getPositionLabel(item))}</td>
+        <td><span class="pts">+${item.points}</span></td>
+        <td><button class="bd" onclick="deleteResult('${item.id}')">Verwijderen</button></td>
+      </tr>
+    `;
   }).join("") || '<tr><td colspan="5" class="empty">Nog geen resultaten.</td></tr>';
 }
 
@@ -873,21 +1003,28 @@ $("add-result-btn").addEventListener("click", async () => {
   const raceId = $("result-race").value;
   const position = $("result-position").value;
   const race = state.races.find(r => r.id === raceId);
-  if (!riderName || !race) { alert("Kies een wedstrijd en vul een renner in."); return; }
+
+  if (!riderName || !race) {
+    alert("Kies een wedstrijd en vul een renner in.");
+    return;
+  }
+
   await addDoc(collection(db, "results"), {
     riderName,
     raceId: race.id,
     raceName: race.name,
     raceType: race.type,
     position,
-    points: calculatePoints(race.type, position),
+    resultKind: "final",
+    stageNumber: null,
+    points: calculatePoints(race.type, position, "final"),
     createdAt: serverTimestamp()
   });
+
   $("result-rider").value = "";
   $("result-position").value = "1";
   toast("Resultaat opgeslagen");
 });
-
 window.deleteTeam = async (teamId) => {
   if (!confirm("Team verwijderen?")) return;
   await deleteDoc(doc(db, "users", state.user.uid, "teams", teamId));
@@ -936,44 +1073,51 @@ window.editResultImport = (raceId) => {
   const race = state.races.find(r => r.id === raceId);
   if (!race) return;
 
-  openModal(`Uitslag importeren: ${escapeHtml(race.name)}`, `
+  const maxPositions = getMaxFinalPositions(race.type);
+
+  openModal(`Eindklassement importeren: ${escapeHtml(race.name)}`, `
     <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="helper">Plak hier een echte uitslag of klassering. De app leest automatisch de top 10 uit en kent daarna de punten toe aan gebruikers die die renners in hun teams hebben.</div>
-      <div class="helper">Let op: plak hier géén startlijst. Gebruik deze import alleen voor een finishklassering.</div>
-      <textarea id="result-import-textarea" class="ta" placeholder="Plak hier de uitslag..."></textarea>
+      <div class="helper">Plak hier het eindklassement. Voor ${escapeHtml(race.type)} worden de eerste ${maxPositions} plaatsen verwerkt.</div>
+      <textarea id="result-import-textarea" class="ta" placeholder="Plak hier het eindklassement..."></textarea>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="bx" id="preview-result-btn">Voorbeeld</button>
-        <button class="bp" id="save-result-import-btn">Opslaan uitslag</button>
-        <button class="bx" id="clear-result-import-btn">Verwijder uitslag</button>
+        <button class="bp" id="save-result-import-btn">Opslaan eindklassement</button>
+        <button class="bx" id="clear-result-import-btn">Verwijder eindklassement</button>
       </div>
       <div id="result-import-preview"></div>
     </div>
   `);
 
   const existing = state.results
-    .filter(result => result.raceId === raceId)
+    .filter(result => result.raceId === raceId && getResultKind(result) === "final")
     .sort((a, b) => (parseInt(a.position, 10) || 99) - (parseInt(b.position, 10) || 99))
     .map(item => `${item.position} ${item.riderName}`)
     .join("\n");
 
   $("result-import-textarea").value = existing;
-  $("result-import-preview").innerHTML = previewImportedResults(parseImportedResultText(existing));
+  $("result-import-preview").innerHTML = previewImportedResults(parseImportedPositions(existing, maxPositions));
 
   $("preview-result-btn").addEventListener("click", () => {
-    const parsed = parseImportedResultText($("result-import-textarea").value);
+    const parsed = parseImportedPositions($("result-import-textarea").value, maxPositions);
     $("result-import-preview").innerHTML = previewImportedResults(parsed);
   });
 
   $("save-result-import-btn").addEventListener("click", async () => {
-    const parsed = parseImportedResultText($("result-import-textarea").value);
+    const parsed = parseImportedPositions($("result-import-textarea").value, maxPositions);
+
     if (!parsed.length) {
-      alert("Geen top-10 uitslag gevonden. Plak hier een echte uitslag of klassering.");
+      alert("Geen geldige eindklassering gevonden.");
       return;
     }
-    const existingDocs = await getDocs(query(collection(db, "results"), where("raceId", "==", raceId)));
-    for (const row of existingDocs.docs) {
-      await deleteDoc(doc(db, "results", row.id));
+
+    const raceDocs = await getDocs(query(collection(db, "results"), where("raceId", "==", raceId)));
+    for (const row of raceDocs.docs) {
+      const data = row.data();
+      if (!data.resultKind || data.resultKind === "final") {
+        await deleteDoc(doc(db, "results", row.id));
+      }
     }
+
     for (const item of parsed) {
       await addDoc(collection(db, "results"), {
         riderName: item.riderName,
@@ -981,21 +1125,144 @@ window.editResultImport = (raceId) => {
         raceName: race.name,
         raceType: race.type,
         position: item.position,
-        points: calculatePoints(race.type, item.position),
+        resultKind: "final",
+        stageNumber: null,
+        points: calculatePoints(race.type, item.position, "final"),
         createdAt: serverTimestamp()
       });
     }
+
     closeModal();
-    toast("Uitslag geïmporteerd");
+    toast("Eindklassement geïmporteerd");
   });
 
   $("clear-result-import-btn").addEventListener("click", async () => {
-    const existingDocs = await getDocs(query(collection(db, "results"), where("raceId", "==", raceId)));
-    for (const row of existingDocs.docs) {
-      await deleteDoc(doc(db, "results", row.id));
+    const raceDocs = await getDocs(query(collection(db, "results"), where("raceId", "==", raceId)));
+    for (const row of raceDocs.docs) {
+      const data = row.data();
+      if (!data.resultKind || data.resultKind === "final") {
+        await deleteDoc(doc(db, "results", row.id));
+      }
     }
+
     closeModal();
-    toast("Uitslag verwijderd");
+    toast("Eindklassement verwijderd");
+  });
+};
+
+window.editStageImport = (raceId) => {
+  const race = state.races.find(r => r.id === raceId);
+  if (!race) return;
+
+  if (!isStageRace(race.type)) {
+    alert("Etappe-uitslagen zijn alleen beschikbaar voor rittenkoersen en grote rondes.");
+    return;
+  }
+
+  const maxPositions = getMaxStagePositions(race.type);
+  const existingStageNumbers = state.results
+    .filter(result => result.raceId === raceId && getResultKind(result) === "stage")
+    .map(result => Number(result.stageNumber))
+    .filter(Boolean);
+
+  const suggestedStage = existingStageNumbers.length ? Math.max(...existingStageNumbers) + 1 : 1;
+
+  openModal(`Etappe importeren: ${escapeHtml(race.name)}`, `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="helper">Plak hier de etappe-uitslag. De eerste ${maxPositions} plaatsen krijgen punten: 70 / 50 / 35 / 20 / 15.</div>
+
+      <div class="fg" style="max-width:180px">
+        <label>Etappenummer</label>
+        <input id="stage-number" type="number" min="1" value="${suggestedStage}">
+      </div>
+
+      <textarea id="stage-import-textarea" class="ta" placeholder="Plak hier de etappe-uitslag..."></textarea>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="bx" id="preview-stage-btn">Voorbeeld</button>
+        <button class="bp" id="save-stage-btn">Opslaan etappe</button>
+        <button class="bx" id="clear-stage-btn">Verwijder etappe</button>
+      </div>
+
+      <div id="stage-import-preview"></div>
+    </div>
+  `);
+
+  const loadStageData = () => {
+    const stageNumber = Math.max(1, parseInt($("stage-number").value, 10) || 1);
+    $("stage-number").value = stageNumber;
+
+    const existing = state.results
+      .filter(result =>
+        result.raceId === raceId &&
+        getResultKind(result) === "stage" &&
+        Number(result.stageNumber) === stageNumber
+      )
+      .sort((a, b) => (parseInt(a.position, 10) || 99) - (parseInt(b.position, 10) || 99))
+      .map(item => `${item.position} ${item.riderName}`)
+      .join("\n");
+
+    $("stage-import-textarea").value = existing;
+    $("stage-import-preview").innerHTML = previewImportedResults(parseImportedPositions(existing, maxPositions));
+  };
+
+  loadStageData();
+
+  $("stage-number").addEventListener("change", loadStageData);
+
+  $("preview-stage-btn").addEventListener("click", () => {
+    const parsed = parseImportedPositions($("stage-import-textarea").value, maxPositions);
+    $("stage-import-preview").innerHTML = previewImportedResults(parsed);
+  });
+
+  $("save-stage-btn").addEventListener("click", async () => {
+    const stageNumber = Math.max(1, parseInt($("stage-number").value, 10) || 1);
+    const parsed = parseImportedPositions($("stage-import-textarea").value, maxPositions);
+
+    if (!parsed.length) {
+      alert("Geen geldige etappe-uitslag gevonden.");
+      return;
+    }
+
+    const raceDocs = await getDocs(query(collection(db, "results"), where("raceId", "==", raceId)));
+    for (const row of raceDocs.docs) {
+      const data = row.data();
+      if (data.resultKind === "stage" && Number(data.stageNumber) === stageNumber) {
+        await deleteDoc(doc(db, "results", row.id));
+      }
+    }
+
+    for (const item of parsed) {
+      await addDoc(collection(db, "results"), {
+        riderName: item.riderName,
+        raceId: race.id,
+        raceName: race.name,
+        raceType: race.type,
+        position: item.position,
+        resultKind: "stage",
+        stageNumber,
+        points: calculatePoints(race.type, item.position, "stage"),
+        createdAt: serverTimestamp()
+      });
+    }
+
+    closeModal();
+    toast(`Etappe ${stageNumber} geïmporteerd`);
+  });
+
+  $("clear-stage-btn").addEventListener("click", async () => {
+    const stageNumber = Math.max(1, parseInt($("stage-number").value, 10) || 1);
+
+    const raceDocs = await getDocs(query(collection(db, "results"), where("raceId", "==", raceId)));
+    for (const row of raceDocs.docs) {
+      const data = row.data();
+      if (data.resultKind === "stage" && Number(data.stageNumber) === stageNumber) {
+        await deleteDoc(doc(db, "results", row.id));
+      }
+    }
+
+    closeModal();
+    toast(`Etappe ${stageNumber} verwijderd`);
   });
 };
 
