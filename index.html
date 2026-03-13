@@ -304,7 +304,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebas
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
 import {
   getFirestore, doc, setDoc, getDoc, addDoc, updateDoc, deleteDoc,
-  collection, collectionGroup, onSnapshot, query, orderBy, serverTimestamp, getDocs
+  collection, collectionGroup, onSnapshot, query, where, orderBy, serverTimestamp, getDocs
 } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
   
 const firebaseConfig = {
