@@ -616,9 +616,14 @@ async function upsertUserDoc(user) {
   }, { merge: true });
 }
 
-async function checkAdmin(uid) {
-  const snap = await getDoc(doc(db, "admins", uid));
-  return snap.exists();
+function updateAdminUI() {
+  $("admin-badge").classList.toggle("hidden", !state.isAdmin);
+  $("admin-tab-btn").classList.toggle("hidden", !state.isAdmin);
+  $("tab-admin").classList.toggle("hidden", !state.isAdmin);
+
+  if (!state.isAdmin && document.querySelector("nav button.active")?.dataset.tab === "admin") {
+    showTab("teams");
+  }
 }
 
 async function seedDefaultRaces() {
@@ -640,6 +645,12 @@ async function seedDefaultRaces() {
 function subscribeData(uid) {
   cleanupListeners();
 
+  state.unsubs.push(onSnapshot(doc(db, "admins", uid), snap => {
+    state.isAdmin = snap.exists();
+    updateAdminUI();
+    renderAll();
+  }));
+
   state.unsubs.push(onSnapshot(query(collection(db, "users", uid, "teams")), snap => {
     state.teams = snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() })).sort((a,b) => (a.name || "").localeCompare(b.name || ""));
     renderAll();
@@ -659,17 +670,10 @@ function subscribeData(uid) {
 async function handleLoggedIn(user) {
   state.user = user;
   await upsertUserDoc(user);
-  state.isAdmin = await checkAdmin(user.uid);
 
   $("user-name").textContent = user.displayName || user.email || "Gebruiker";
   $("user-uid").textContent = user.uid;
-  $("admin-badge").classList.toggle("hidden", !state.isAdmin);
-  $("admin-tab-btn").classList.toggle("hidden", !state.isAdmin);
-  $("tab-admin").classList.toggle("hidden", !state.isAdmin);
-
-  if (!state.isAdmin && document.querySelector("nav button.active")?.dataset.tab === "admin") {
-    showTab("teams");
-  }
+  updateAdminUI();
 
   subscribeData(user.uid);
   setAuthView(true);
@@ -683,6 +687,7 @@ async function handleLoggedOut() {
   state.teams = [];
   state.races = [];
   state.results = [];
+  updateAdminUI();
   setAuthView(false);
   hideLoader();
 }
