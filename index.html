@@ -286,7 +286,6 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
 import {
-import {
   getFirestore, doc, setDoc, getDoc, addDoc, updateDoc, deleteDoc,
   collection, onSnapshot, query, orderBy, serverTimestamp, getDocs, where
 } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
@@ -479,16 +478,6 @@ function matchRiderInText(name, sourceText) {
 
     return foundFamily >= Math.min(2, family.length);
   });
-}
-
-function matchRiderInText(name, sourceText) {
-  const text = ` ${normalizeText(sourceText)} `;
-  const parsed = parseName(name);
-  const firstOk = parsed.first.every(tok => text.includes(` ${tok} `));
-  if (!firstOk) return false;
-  const family = strongFamilyTokens(parsed.family);
-  const foundFamily = family.filter(tok => text.includes(` ${tok} `)).length;
-  return foundFamily >= Math.min(2, family.length);
 }
 
 function getRaceCss(type) {
@@ -686,26 +675,43 @@ function renderScores() {
     return `<tr><td style="font-weight:500">${escapeHtml(item.riderName)}</td><td style="color:var(--muted)">${escapeHtml(team?.name || "-")}</td><td>${escapeHtml(item.raceName)}</td><td style="color:var(--muted)">${escapeHtml(posLabel)}</td><td><span class="pts">+${item.points}</span></td></tr>`;
   }).join("") || '<tr><td colspan="5" class="empty">Nog geen resultaten voor jouw renners.</td></tr>';
 }
+function renderAdmin() {
+  const racesTbody = $("admin-races-tbody");
+  racesTbody.innerHTML = state.races.map(race => {
+    const lineCount = (race.startlistText || "").split(/\n+/).map(v => v.trim()).filter(Boolean).length;
+    const startlistStatus = lineCount ? `<span class="badge ok">${lineCount} regels</span>` : '<span class="badge">Leeg</span>';
 
-const racesTbody = $("admin-races-tbody");
-racesTbody.innerHTML = state.races.map(race => {
-  const lineCount = (race.startlistText || "").split(/\n+/).map(v => v.trim()).filter(Boolean).length;
-  const startlistStatus = lineCount ? `<span class="badge ok">${lineCount} regels</span>` : '<span class="badge">Leeg</span>';
+    const resultCount = countRaceResults(race.id);
+    const resultStatus = resultCount ? `<span class="badge ok">${resultCount} regels</span>` : '<span class="badge">Leeg</span>';
 
-  const resultCount = countRaceResults(race.id);
-  const resultStatus = resultCount ? `<span class="badge ok">${resultCount} regels</span>` : '<span class="badge">Leeg</span>';
+    return `<tr>
+      <td style="font-weight:500">${escapeHtml(race.name)}</td>
+      <td><span class="rt ${getRaceCss(race.type)}">${escapeHtml(race.type)}</span></td>
+      <td style="color:var(--muted);font-size:12px">${escapeHtml(race.date || "")}</td>
+      <td>${startlistStatus}</td>
+      <td>${resultStatus}</td>
+      <td><button class="bx" onclick="editStartlist('${race.id}')">Startlijst</button></td>
+      <td><button class="bx" onclick="editResultImport('${race.id}')">Uitslag</button></td>
+      <td><button class="bd" onclick="deleteRace('${race.id}')">Verwijderen</button></td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="8" class="empty">Nog geen wedstrijden.</td></tr>';
 
-  return `<tr>
-    <td style="font-weight:500">${escapeHtml(race.name)}</td>
-    <td><span class="rt ${getRaceCss(race.type)}">${escapeHtml(race.type)}</span></td>
-    <td style="color:var(--muted);font-size:12px">${escapeHtml(race.date || "")}</td>
-    <td>${startlistStatus}</td>
-    <td>${resultStatus}</td>
-    <td><button class="bx" onclick="editStartlist('${race.id}')">Startlijst</button></td>
-    <td><button class="bx" onclick="editResultImport('${race.id}')">Uitslag</button></td>
-    <td><button class="bd" onclick="deleteRace('${race.id}')">Verwijderen</button></td>
-  </tr>`;
-}).join("") || '<tr><td colspan="8" class="empty">Nog geen wedstrijden.</td></tr>';
+  const raceSelect = $("result-race");
+  raceSelect.innerHTML = state.races.map(race => `<option value="${race.id}">${escapeHtml(race.name)}</option>`).join("") || '<option value="">Geen wedstrijden</option>';
+
+  const resultsTbody = $("admin-results-tbody");
+  resultsTbody.innerHTML = state.results.map(item => {
+    const posLabel = item.position === "etappe" ? "Etappezege" : `No. ${item.position}`;
+    return `<tr>
+      <td style="font-weight:500">${escapeHtml(item.riderName)}</td>
+      <td>${escapeHtml(item.raceName)}</td>
+      <td style="color:var(--muted)">${escapeHtml(posLabel)}</td>
+      <td><span class="pts">+${item.points}</span></td>
+      <td><button class="bd" onclick="deleteResult('${item.id}')">Verwijderen</button></td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="5" class="empty">Nog geen resultaten.</td></tr>';
+}
+
 
   const raceSelect = $("result-race");
   raceSelect.innerHTML = state.races.map(race => `<option value="${race.id}">${escapeHtml(race.name)}</option>`).join("") || '<option value="">Geen wedstrijden</option>';
