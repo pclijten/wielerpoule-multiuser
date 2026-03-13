@@ -230,11 +230,22 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
         </div>
       </div>
 
-      <div class="sec">Startlijsten beheren</div>
-      <table class="rtbl" style="margin-bottom:28px">
-        <thead><tr><th>Wedstrijd</th><th>Type</th><th>Datum</th><th>Startlijst</th><th></th><th></th></tr></thead>
-        <tbody id="admin-races-tbody"></tbody>
-      </table>
+<div class="sec">Startlijsten en uitslagen beheren</div>
+<table class="rtbl" style="margin-bottom:28px">
+  <thead>
+    <tr>
+      <th>Wedstrijd</th>
+      <th>Type</th>
+      <th>Datum</th>
+      <th>Startlijst</th>
+      <th>Uitslag</th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody id="admin-races-tbody"></tbody>
+</table>
 
       <div class="form-card">
         <h3>Resultaat toevoegen</h3>
@@ -276,7 +287,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebas
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
 import {
   getFirestore, doc, setDoc, getDoc, addDoc, updateDoc, deleteDoc,
-  collection, onSnapshot, query, orderBy, serverTimestamp, getDocs
+  collection, onSnapshot, query, orderBy, serverTimestamp, getDocs, where
 } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -448,7 +459,93 @@ function calculatePoints(type, position) {
   if (Array.isArray(table)) return table[index] || 0;
   return table.kl ? table.kl[index] || 0 : 0;
 }
+function cleanImportedName(value) {
+  return String(value || "")
+    .replace(/\s*\([^)]*\)\s*$/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
 
+function looksLikeRiderName(value) {
+  const text = cleanImportedName(value);
+  if (!text) return false;
+  if (/^(dnf|dns|dsq|otl|abd|np|e\d+)/i.test(text)) return false;
+
+  const words = rawWords(text);
+  if (words.length < 2) return false;
+
+  if (/(victorious|team|cycling|grenadiers|mobility|easy ?post|quick ?step|visitmalta|emirates|postnl|hansgrohe|fdj|astana|trek|movistar|visma|alula)/i.test(text) && words.length > 3) {
+    return false;
+  }
+
+  return true;
+}
+
+function parseImportedResultText(text) {
+  const lines = String(text || "")
+    .replace(/\r/g, "")
+    .split("\n")
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  const out = [];
+  const seen = new Set();
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    const sameLine = line.match(/^(\d{1,2})(?:[.)]|\s)\s*(.+)$/);
+    if (sameLine) {
+      const rank = parseInt(sameLine[1], 10);
+      const riderName = cleanImportedName(sameLine[2]);
+
+      if (rank >= 1 && rank <= 10 && looksLikeRiderName(riderName) && !seen.has(rank)) {
+        out.push({ position: String(rank), riderName });
+        seen.add(rank);
+        continue;
+      }
+    }
+
+    const splitLine = line.match(/^(\d{1,2})$/);
+    if (splitLine && i + 1 < lines.length) {
+      const rank = parseInt(splitLine[1], 10);
+      const riderName = cleanImportedName(lines[i + 1]);
+
+      if (rank >= 1 && rank <= 10 && looksLikeRiderName(riderName) && !seen.has(rank)) {
+        out.push({ position: String(rank), riderName });
+        seen.add(rank);
+        i += 1;
+      }
+    }
+  }
+
+  return out.sort((a, b) => parseInt(a.position, 10) - parseInt(b.position, 10));
+}
+
+function previewImportedResults(items) {
+  if (!items.length) {
+    return '<div class="empty">Geen top-10 uitslag gevonden. Plak hier een echte uitslag of klassering, niet de startlijst.</div>';
+  }
+
+  return `
+    <table class="restbl">
+      <thead><tr><th>Positie</th><th>Renner</th></tr></thead>
+      <tbody>
+        ${items.map(item => `
+          <tr>
+            <td style="font-weight:600">${item.position}</td>
+            <td>${escapeHtml(item.riderName)}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function countRaceResults(raceId) {
+  return state.results.filter(result => result.raceId === raceId).length;
+}
+  
 function teamResults(team) {
   return state.results.filter(result => team.riders.some(r => sameRiderName(r, result.riderName)));
 }
@@ -544,19 +641,25 @@ function renderScores() {
 }
 
 function renderAdmin() {
-  const racesTbody = $("admin-races-tbody");
-  racesTbody.innerHTML = state.races.map(race => {
-    const lineCount = (race.startlistText || "").split(/\n+/).map(v => v.trim()).filter(Boolean).length;
-    const status = lineCount ? `<span class="badge ok">${lineCount} regels</span>` : '<span class="badge">Leeg</span>';
-    return `<tr>
-      <td style="font-weight:500">${escapeHtml(race.name)}</td>
-      <td><span class="rt ${getRaceCss(race.type)}">${escapeHtml(race.type)}</span></td>
-      <td style="color:var(--muted);font-size:12px">${escapeHtml(race.date || "")}</td>
-      <td>${status}</td>
-      <td><button class="bx" onclick="editStartlist('${race.id}')">Startlijst</button></td>
-      <td><button class="bd" onclick="deleteRace('${race.id}')">Verwijderen</button></td>
-    </tr>`;
-  }).join("") || '<tr><td colspan="6" class="empty">Nog geen wedstrijden.</td></tr>';
+const racesTbody = $("admin-races-tbody");
+racesTbody.innerHTML = state.races.map(race => {
+  const lineCount = (race.startlistText || "").split(/\n+/).map(v => v.trim()).filter(Boolean).length;
+  const startlistStatus = lineCount ? `<span class="badge ok">${lineCount} regels</span>` : '<span class="badge">Leeg</span>';
+
+  const resultCount = countRaceResults(race.id);
+  const resultStatus = resultCount ? `<span class="badge ok">${resultCount} regels</span>` : '<span class="badge">Leeg</span>';
+
+  return `<tr>
+    <td style="font-weight:500">${escapeHtml(race.name)}</td>
+    <td><span class="rt ${getRaceCss(race.type)}">${escapeHtml(race.type)}</span></td>
+    <td style="color:var(--muted);font-size:12px">${escapeHtml(race.date || "")}</td>
+    <td>${startlistStatus}</td>
+    <td>${resultStatus}</td>
+    <td><button class="bx" onclick="editStartlist('${race.id}')">Startlijst</button></td>
+    <td><button class="bx" onclick="editResultImport('${race.id}')">Uitslag</button></td>
+    <td><button class="bd" onclick="deleteRace('${race.id}')">Verwijderen</button></td>
+  </tr>`;
+}).join("") || '<tr><td colspan="8" class="empty">Nog geen wedstrijden.</td></tr>';
 
   const raceSelect = $("result-race");
   raceSelect.innerHTML = state.races.map(race => `<option value="${race.id}">${escapeHtml(race.name)}</option>`).join("") || '<option value="">Geen wedstrijden</option>';
@@ -829,7 +932,77 @@ window.editStartlist = (raceId) => {
     toast("Startlijst leeggemaakt");
   });
 };
+window.editResultImport = (raceId) => {
+  const race = state.races.find(r => r.id === raceId);
+  if (!race) return;
 
+  openModal(`Uitslag importeren: ${escapeHtml(race.name)}`, `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="helper">Plak hier een echte uitslag of klassering. De app leest automatisch de top 10 uit en kent daarna de punten toe aan gebruikers die die renners in hun teams hebben.</div>
+      <div class="helper">Let op: plak hier géén startlijst. Gebruik deze import alleen voor een finishklassering.</div>
+      <textarea id="result-import-textarea" class="ta" placeholder="Plak hier de uitslag..."></textarea>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="bx" id="preview-result-btn">Voorbeeld</button>
+        <button class="bp" id="save-result-import-btn">Opslaan uitslag</button>
+        <button class="bx" id="clear-result-import-btn">Verwijder uitslag</button>
+      </div>
+      <div id="result-import-preview"></div>
+    </div>
+  `);
+
+  const existing = state.results
+    .filter(result => result.raceId === raceId)
+    .sort((a, b) => (parseInt(a.position, 10) || 99) - (parseInt(b.position, 10) || 99))
+    .map(item => `${item.position} ${item.riderName}`)
+    .join("\n");
+
+  $("result-import-textarea").value = existing;
+  $("result-import-preview").innerHTML = previewImportedResults(parseImportedResultText(existing));
+
+  $("preview-result-btn").addEventListener("click", () => {
+    const parsed = parseImportedResultText($("result-import-textarea").value);
+    $("result-import-preview").innerHTML = previewImportedResults(parsed);
+  });
+
+  $("save-result-import-btn").addEventListener("click", async () => {
+    const parsed = parseImportedResultText($("result-import-textarea").value);
+
+    if (!parsed.length) {
+      alert("Geen top-10 uitslag gevonden. Plak hier een echte uitslag of klassering.");
+      return;
+    }
+
+    const existingDocs = await getDocs(query(collection(db, "results"), where("raceId", "==", raceId)));
+    for (const row of existingDocs.docs) {
+      await deleteDoc(doc(db, "results", row.id));
+    }
+
+    for (const item of parsed) {
+      await addDoc(collection(db, "results"), {
+        riderName: item.riderName,
+        raceId: race.id,
+        raceName: race.name,
+        raceType: race.type,
+        position: item.position,
+        points: calculatePoints(race.type, item.position),
+        createdAt: serverTimestamp()
+      });
+    }
+
+    closeModal();
+    toast("Uitslag geïmporteerd");
+  });
+
+  $("clear-result-import-btn").addEventListener("click", async () => {
+    const existingDocs = await getDocs(query(collection(db, "results"), where("raceId", "==", raceId)));
+    for (const row of existingDocs.docs) {
+      await deleteDoc(doc(db, "results", row.id));
+    }
+
+    closeModal();
+    toast("Uitslag verwijderd");
+  });
+};
 window.openRaceMatches = (raceId) => {
   const race = state.races.find(r => r.id === raceId);
   if (!race) return;
