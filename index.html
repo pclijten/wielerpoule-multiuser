@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Directeur Sportief 2026 Multi-user</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500;600;700&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0c10; --surface:#12151c; --surface2:#1a1e28; --border:#252a38;
+  --accent:#e8b422; --accent2:#c4341a; --text:#e8eaf0; --muted:#6b7280;
+  --ok:#4ade80; --t1:#1a6e3c; --t2:#1a3d6e; --t3:#6e1a1a;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font-weight:300;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(-45deg,transparent,transparent 40px,rgba(255,255,255,.012) 40px,rgba(255,255,255,.012) 41px);pointer-events:none;z-index:0}
+.hidden{display:none!important}
+
+#loader{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:20px;transition:opacity .4s}
+#loader.hidden{opacity:0;pointer-events:none;display:flex!important}
+.lt{font-family:'Bebas Neue',sans-serif;font-size:48px;color:var(--accent);letter-spacing:4px}
+.ls{font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:3px;color:var(--muted);text-transform:uppercase}
+.lbar{width:200px;height:2px;background:var(--border);border-radius:2px;overflow:hidden}
+.lbar-fill{height:100%;background:var(--accent);animation:lb 1.5s ease-in-out infinite}
+@keyframes lb{0%{width:0%;margin-left:0}50%{width:60%;margin-left:20%}100%{width:0%;margin-left:100%}}
+
+.auth-wrap{position:relative;z-index:2;min-height:100vh;display:grid;place-items:center;padding:32px}
+.auth-card{width:min(560px,100%);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:32px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.auth-logo{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:3px;line-height:1;color:var(--accent);margin-bottom:20px}
+.auth-logo span{color:var(--text);font-size:24px;display:block;letter-spacing:8px;margin-bottom:6px}
+.auth-card h1{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;color:var(--accent);margin-bottom:10px}
+.auth-card p{color:var(--muted);line-height:1.6;margin-bottom:20px}
+.auth-note{margin-top:14px;font-size:12px;color:var(--muted)}
+
+header{position:relative;z-index:10;padding:24px 32px 0;display:flex;align-items:flex-end;gap:24px;border-bottom:1px solid var(--border)}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:3px;line-height:1;color:var(--accent)}
+.logo span{color:var(--text);font-size:26px;display:block;letter-spacing:8px;margin-bottom:6px}
+.top-right{margin-left:auto;display:flex;align-items:flex-end;gap:24px;flex-wrap:wrap}
+.userbox{display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-bottom:8px}
+.userline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.userline strong{font-size:14px;font-weight:600}
+.small{font-size:11px;color:var(--muted);font-family:'Barlow Condensed',sans-serif;letter-spacing:1px;text-transform:uppercase}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:var(--surface2);font-size:11px;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.badge.ok{color:var(--ok);border-color:rgba(74,222,128,.35);background:rgba(74,222,128,.08)}
+.badge.warn{color:var(--accent);border-color:rgba(232,180,34,.35);background:rgba(232,180,34,.08)}
+nav{display:flex;gap:2px}
+nav button{background:none;border:none;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:600;letter-spacing:2px;text-transform:uppercase;padding:12px 20px;cursor:pointer;transition:all .2s;border-bottom:2px solid transparent;position:relative;bottom:-1px}
+nav button:hover{color:var(--text)}
+nav button.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
+.tab{display:none}
+.tab.active{display:block;animation:fi .2s}
+@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+.sec{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:3px;color:var(--accent);margin-bottom:20px;display:flex;align-items:center;gap:12px}
+.sec::after{content:'';flex:1;height:1px;background:var(--border)}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+
+.tgrid,.sbrd{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.thead,.sch{padding:14px 18px;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;display:flex;justify-content:space-between;align-items:center}
+.thead.t1,.sch.t1{background:var(--t1)}
+.thead.t2,.sch.t2{background:var(--t2)}
+.thead.t3,.sch.t3{background:var(--t3)}
+.tpts{font-size:14px;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px;opacity:.85}
+.rrow{display:flex;align-items:center;padding:10px 18px;border-bottom:1px solid var(--border);gap:10px;transition:background .15s}
+.rrow:hover{background:var(--surface2)}
+.rrow:last-child{border-bottom:none}
+.rname{flex:1;font-size:13px;font-weight:500;letter-spacing:.4px}
+.rpts,.sct{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:var(--accent);min-width:50px;text-align:right}
+.scb{padding:12px 18px}
+.sr{display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--border);color:var(--muted)}
+.sr:last-child{border-bottom:none}
+.sr strong{color:var(--text)}
+.team-meta{padding:14px 18px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)}
+.empty{padding:24px;color:var(--muted);text-align:center}
+
+.rtbl,.restbl{width:100%;border-collapse:collapse;background:var(--surface);border-radius:6px;overflow:hidden}
+.rtbl th,.restbl th{background:var(--surface2);padding:11px 14px;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.rtbl td,.restbl td{padding:11px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+.rtbl tr:last-child td,.restbl tr:last-child td{border-bottom:none}
+.crow{cursor:pointer}
+.crow:hover td{background:var(--surface2)}
+.rt{font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:2px;background:var(--surface2);color:var(--muted)}
+.rt.monument{background:rgba(232,180,34,.15);color:var(--accent)}
+.rt.grande{background:rgba(196,52,26,.15);color:#e87060}
+.rt.rit{background:rgba(26,110,60,.15);color:#60c88f}
+.rt.divers{background:rgba(100,80,200,.15);color:#a090e0}
+.pts{background:rgba(232,180,34,.18);color:var(--accent);font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;padding:2px 10px;border-radius:3px}
+
+.form-card{background:var(--surface);border:1px solid var(--border);padding:24px;border-radius:6px;margin-bottom:24px}
+.form-card h3{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;margin-bottom:18px;color:var(--accent)}
+.frow{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:end}
+.fg{display:flex;flex-direction:column;gap:6px}
+.fg label{font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.fg select,.fg input,.mi,.ta{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:4px;font-family:'Barlow',sans-serif;font-size:13px;outline:none;transition:border-color .2s}
+.fg select:focus,.fg input:focus,.mi:focus,.ta:focus{border-color:var(--accent)}
+.fg select option{background:var(--surface2)}
+.mi{width:100%}
+.ta{width:100%;min-height:360px;resize:vertical;line-height:1.55}
+.helper{font-size:12px;color:var(--muted);line-height:1.6}
+
+.bp,.bx,.bd{border:none;padding:10px 16px;border-radius:4px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;transition:opacity .2s,border-color .2s,color .2s}
+.bp{background:var(--accent);color:#000}
+.bp:hover{opacity:.88}
+.bx{background:transparent;color:var(--text);border:1px solid var(--border)}
+.bx:hover{border-color:var(--accent);color:var(--accent)}
+.bd{background:var(--accent2);color:#fff}
+.bd:hover{opacity:.82}
+
+.mov{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;animation:fi .2s}
+.mo{background:var(--surface);border:1px solid var(--border);border-radius:6px;max-width:860px;width:100%;max-height:84vh;overflow-y:auto;animation:su .25s ease}
+@keyframes su{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.moh{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--surface);z-index:1}
+.mot{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;color:var(--accent)}
+.moc{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;transition:color .2s}
+.moc:hover{color:var(--text)}
+.mob{padding:24px}
+.loading{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:14px;padding:20px 0}
+.spin{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.slist{display:flex;flex-wrap:wrap;gap:8px;padding-top:14px}
+.chip{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:6px 14px;font-size:13px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px}
+.chip.t1{border-left:3px solid var(--t1)}.chip.t2{border-left:3px solid var(--t2)}.chip.t3{border-left:3px solid var(--t3)}.chip.tX{border-left:3px solid var(--accent)}
+
+#toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--ok);color:var(--ok);padding:10px 18px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:1px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none}
+#toast.show{opacity:1}
+
+@media(max-width:1100px){.tgrid,.sbrd{grid-template-columns:1fr}}
+@media(max-width:900px){
+  .frow{grid-template-columns:1fr 1fr}
+  header{flex-wrap:wrap}
+  .top-right{width:100%;justify-content:space-between}
+  nav{width:100%;overflow-x:auto}
+  .logo{font-size:38px}
+}
+</style>
+</head>
+<body>
+<div id="loader">
+  <div class="lt">DS 2026</div>
+  <div class="ls">App laden...</div>
+  <div class="lbar"><div class="lbar-fill"></div></div>
+</div>
+
+<div id="auth-screen" class="auth-wrap hidden">
+  <div class="auth-card">
+    <div class="auth-logo"><span>Directeur Sportief</span>2026</div>
+    <h1>Multi-user wielerpoule</h1>
+    <p>Iedere gebruiker logt in met zijn eigen account, importeert zijn eigen teams en ziet daarna alleen zijn eigen renners terug bij startlijsten en in de puntenstand.</p>
+    <button class="bp" id="login-btn">Inloggen met Google</button>
+    <div class="auth-note">Tip: zet Google login aan in Firebase Authentication. Dit is de makkelijkste route voor jouw gebruikers.</div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <div class="logo"><span>Directeur Sportief</span>2026</div>
+    <div class="top-right">
+      <div class="userbox">
+        <div class="userline">
+          <span class="badge ok" id="db-badge">Live verbonden</span>
+          <span class="badge warn hidden" id="admin-badge">Admin</span>
+        </div>
+        <div class="userline">
+          <strong id="user-name">—</strong>
+          <button class="bx" id="logout-btn">Uitloggen</button>
+        </div>
+        <div class="small">UID: <span id="user-uid">—</span></div>
+      </div>
+      <nav>
+        <button class="active" data-tab="teams">Mijn teams</button>
+        <button data-tab="races">Wedstrijden</button>
+        <button data-tab="scores">Puntenstand</button>
+        <button data-tab="admin" id="admin-tab-btn" class="hidden">Admin</button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="tab active" id="tab-teams">
+      <div class="sec">Mijn teams</div>
+      <div class="toolbar">
+        <button class="bp" id="import-teams-btn">Teams importeren</button>
+      </div>
+      <div class="helper" style="margin-bottom:18px">Importeer je teams via copy/paste. Formaat: eerst de teamnaam, daaronder de renners, met een lege regel tussen teams.</div>
+      <div class="tgrid" id="teams-grid"></div>
+    </section>
+
+    <section class="tab" id="tab-races">
+      <div class="sec">Wedstrijdkalender</div>
+      <table class="rtbl">
+        <thead><tr><th>#</th><th>Wedstrijd</th><th>Type</th><th>Datum</th><th>Startlijst</th><th>Mijn starters</th></tr></thead>
+        <tbody id="races-tbody"></tbody>
+      </table>
+    </section>
+
+    <section class="tab" id="tab-scores">
+      <div class="sec">Puntenstand</div>
+      <div class="sbrd" id="scoreboard"></div>
+      <div class="sec">Mijn resultaten</div>
+      <table class="restbl">
+        <thead><tr><th>Renner</th><th>Team</th><th>Wedstrijd</th><th>Positie</th><th>Punten</th></tr></thead>
+        <tbody id="my-results-tbody"></tbody>
+      </table>
+    </section>
+
+    <section class="tab hidden" id="tab-admin">
+      <div class="sec">Admin</div>
+      <div class="toolbar">
+        <button class="bp" id="seed-races-btn">Standaardkalender laden</button>
+      </div>
+
+      <div class="form-card">
+        <h3>Wedstrijd toevoegen</h3>
+        <div class="frow">
+          <div class="fg"><label>Wedstrijd</label><input id="race-name" placeholder="Naam wedstrijd"></div>
+          <div class="fg"><label>Type</label>
+            <select id="race-type">
+              <option value="Eendaagse">Eendaagse</option>
+              <option value="Monument">Monument</option>
+              <option value="Rittenkoers">Rittenkoers</option>
+              <option value="Grote Ronde">Grote Ronde</option>
+              <option value="Divers">Divers</option>
+            </select>
+          </div>
+          <div class="fg"><label>Datum</label><input id="race-date" placeholder="Bijv. 11 mrt 2026"></div>
+          <button class="bp" id="add-race-btn">Toevoegen</button>
+        </div>
+      </div>
+
+      <div class="sec">Startlijsten beheren</div>
+      <table class="rtbl" style="margin-bottom:28px">
+        <thead><tr><th>Wedstrijd</th><th>Type</th><th>Datum</th><th>Startlijst</th><th></th><th></th></tr></thead>
+        <tbody id="admin-races-tbody"></tbody>
+      </table>
+
+      <div class="form-card">
+        <h3>Resultaat toevoegen</h3>
+        <div class="frow">
+          <div class="fg"><label>Renner</label><input id="result-rider" placeholder="Bijv. Mathieu van der Poel"></div>
+          <div class="fg"><label>Wedstrijd</label><select id="result-race"></select></div>
+          <div class="fg"><label>Positie</label>
+            <select id="result-position">
+              <option value="1">1e plaats</option><option value="2">2e plaats</option><option value="3">3e plaats</option>
+              <option value="4">4e plaats</option><option value="5">5e plaats</option><option value="6">6e plaats</option>
+              <option value="7">7e plaats</option><option value="8">8e plaats</option><option value="9">9e plaats</option>
+              <option value="10">10e plaats</option><option value="etappe">Etappezege</option>
+            </select>
+          </div>
+          <button class="bp" id="add-result-btn">Opslaan</button>
+        </div>
+      </div>
+
+      <div class="sec">Alle resultaten</div>
+      <table class="restbl">
+        <thead><tr><th>Renner</th><th>Wedstrijd</th><th>Positie</th><th>Punten</th><th></th></tr></thead>
+        <tbody id="admin-results-tbody"></tbody>
+      </table>
+    </section>
+  </main>
+</div>
+
+<div id="modal" class="mov hidden">
+  <div class="mo">
+    <div class="moh"><span class="mot" id="modal-title">—</span><button class="moc" id="modal-close">&#10005;</button></div>
+    <div class="mob" id="modal-body"></div>
+  </div>
+</div>
+
+<div id="toast">Opgeslagen</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
+import {
+  getFirestore, doc, setDoc, getDoc, addDoc, updateDoc, deleteDoc,
+  collection, onSnapshot, query, orderBy, serverTimestamp, getDocs
+} from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBCxSf3p7c1C195OPxB1r9zvvI6qtnYyW4",
+  authDomain: "directeur-sportief-2026.firebaseapp.com",
+  projectId: "directeur-sportief-2026",
+  storageBucket: "Vdirecteur-sportief-2026.firebasestorage.app",
+  messagingSenderId: "856032444923",
+  appId: "1:856032444923:web:baabe3a3fb82c3bbe5cb5e"
+};
+
+const DEFAULT_RACES = [
+  {name:"Omloop het Nieuwsblad",type:"Eendaagse",date:"28 feb 2026",sortOrder:1},
+  {name:"Strade Bianche",type:"Monument",date:"7 mrt 2026",sortOrder:2},
+  {name:"Parijs-Nice",type:"Rittenkoers",date:"9 mrt 2026",sortOrder:3},
+  {name:"Tirreno Adriatico",type:"Rittenkoers",date:"11 mrt 2026",sortOrder:4},
+  {name:"Milaan - San Remo",type:"Monument",date:"21 mrt 2026",sortOrder:5},
+  {name:"E3 Prijs",type:"Eendaagse",date:"27 mrt 2026",sortOrder:6},
+  {name:"Gent - Wevelgem",type:"Eendaagse",date:"29 mrt 2026",sortOrder:7},
+  {name:"Ronde van Catalonië",type:"Rittenkoers",date:"23 mrt 2026",sortOrder:8},
+  {name:"Dwars door Vlaanderen",type:"Eendaagse",date:"1 apr 2026",sortOrder:9},
+  {name:"Ronde van Vlaanderen",type:"Monument",date:"5 apr 2026",sortOrder:10},
+  {name:"Scheldeprijs",type:"Eendaagse",date:"8 apr 2026",sortOrder:11},
+  {name:"Ronde van het Baskenland",type:"Rittenkoers",date:"6 apr 2026",sortOrder:12},
+  {name:"Parijs - Roubaix",type:"Monument",date:"12 apr 2026",sortOrder:13},
+  {name:"Amstel Gold Race",type:"Eendaagse",date:"19 apr 2026",sortOrder:14},
+  {name:"Waalse Pijl",type:"Eendaagse",date:"22 apr 2026",sortOrder:15},
+  {name:"Luik - Bastenaken - Luik",type:"Monument",date:"26 apr 2026",sortOrder:16},
+  {name:"Ronde van Romandië",type:"Rittenkoers",date:"28 apr 2026",sortOrder:17},
+  {name:"Giro d'Italia",type:"Grote Ronde",date:"9 mei 2026",sortOrder:18},
+  {name:"Critérium du Dauphiné",type:"Rittenkoers",date:"31 mei 2026",sortOrder:19},
+  {name:"Ronde van Zwitserland",type:"Rittenkoers",date:"7 jun 2026",sortOrder:20},
+  {name:"NK Wielrennen",type:"Divers",date:"28 jun 2026",sortOrder:21},
+  {name:"Tour de France",type:"Grote Ronde",date:"4 jul 2026",sortOrder:22},
+  {name:"Clasica San Sebastian",type:"Eendaagse",date:"1 aug 2026",sortOrder:23},
+  {name:"Renewi Tour (Benelux)",type:"Rittenkoers",date:"11 aug 2026",sortOrder:24},
+  {name:"La Vuelta Ciclista a España",type:"Grote Ronde",date:"22 aug 2026",sortOrder:25},
+  {name:"GP Québec",type:"Eendaagse",date:"11 sep 2026",sortOrder:26},
+  {name:"GP Montréal",type:"Eendaagse",date:"13 sep 2026",sortOrder:27},
+  {name:"WK (tijdrit)",type:"Divers",date:"20 sep 2026",sortOrder:28}
+];
+
+const POINTS_TABLE = {
+  Eendaagse:[200,161,136,116,101,87,76,65,56,47],
+  Monument:[300,241,203,173,149,129,111,96,81,68],
+  Rittenkoers:{kl:[250,207,179,157,140,125,112,100,90,80],et:70},
+  "Grote Ronde":{kl:[450,372,321,283,251,224,201,180,161,143],et:70},
+  Divers:[250,189,149,119,94,73,55,38,24,10]
+};
+
+const FAMILY_PARTICLES = new Set(["van","der","den","de","del","della","di","da","dos","du","la","le","el"]);
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const provider = new GoogleAuthProvider();
+
+const state = {
+  user: null,
+  isAdmin: false,
+  teams: [],
+  races: [],
+  results: [],
+  unsubs: []
+};
+
+const $ = (id) => document.getElementById(id);
+const toast = (msg = "Opgeslagen") => {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2200);
+};
+const hideLoader = () => {
+  const el = $("loader");
+  el.classList.add("hidden");
+  setTimeout(() => el.style.display = "none", 350);
+};
+const cleanupListeners = () => {
+  state.unsubs.forEach(fn => fn && fn());
+  state.unsubs = [];
+};
+
+function setAuthView(loggedIn) {
+  $("auth-screen").classList.toggle("hidden", loggedIn);
+  $("app").classList.toggle("hidden", !loggedIn);
+}
+
+function normalizeText(value) {
+  return (value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/['’.-]/g, " ")
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function rawWords(name) {
+  return String(name || "")
+    .replace(/[0-9]/g, " ")
+    .replace(/[.,;:()\[\]{}\/]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function isAllCapsToken(token) {
+  return token === token.toUpperCase() && token !== token.toLowerCase();
+}
+
+function parseName(name) {
+  const raw = rawWords(name);
+  const clean = raw.map(normalizeText).filter(Boolean);
+  if (clean.length < 2) return { first: clean, family: clean };
+
+  let cut = 0;
+  while (cut < raw.length - 1 && isAllCapsToken(raw[cut])) cut++;
+  if (cut > 0 && cut < raw.length) {
+    return {
+      first: clean.slice(cut),
+      family: clean.slice(0, cut)
+    };
+  }
+  return {
+    first: [clean[0]],
+    family: clean.slice(1)
+  };
+}
+
+function strongFamilyTokens(family) {
+  const strong = family.filter(t => !FAMILY_PARTICLES.has(t));
+  return strong.length ? strong : family;
+}
+
+function sameRiderName(a, b) {
+  const A = parseName(a);
+  const B = parseName(b);
+  const firstOk = A.first.some(t => B.first.includes(t));
+  if (!firstOk) return false;
+  const famA = strongFamilyTokens(A.family);
+  const famB = strongFamilyTokens(B.family);
+  const overlap = famA.filter(t => famB.includes(t)).length;
+  return overlap >= Math.min(2, famA.length, famB.length);
+}
+
+function matchRiderInText(name, sourceText) {
+  const text = ` ${normalizeText(sourceText)} `;
+  const parsed = parseName(name);
+  const firstOk = parsed.first.every(tok => text.includes(` ${tok} `));
+  if (!firstOk) return false;
+  const family = strongFamilyTokens(parsed.family);
+  const foundFamily = family.filter(tok => text.includes(` ${tok} `)).length;
+  return foundFamily >= Math.min(2, family.length);
+}
+
+function getRaceCss(type) {
+  return {Monument:"monument","Grote Ronde":"grande",Rittenkoers:"rit",Divers:"divers"}[type] || "";
+}
+
+function calculatePoints(type, position) {
+  if (position === "etappe") {
+    const table = POINTS_TABLE[type];
+    return table && table.et ? table.et : 0;
+  }
+  const index = parseInt(position, 10) - 1;
+  const table = POINTS_TABLE[type];
+  if (!table) return 0;
+  if (Array.isArray(table)) return table[index] || 0;
+  return table.kl ? table.kl[index] || 0 : 0;
+}
+
+function teamResults(team) {
+  return state.results.filter(result => team.riders.some(r => sameRiderName(r, result.riderName)));
+}
+
+function totalTeamPoints(team) {
+  return teamResults(team).reduce((sum, item) => sum + (item.points || 0), 0);
+}
+
+function relevantResults() {
+  return state.results.filter(result => state.teams.some(team => team.riders.some(r => sameRiderName(r, result.riderName))));
+}
+
+function raceMatchesForUser(race) {
+  const text = race.startlistText || "";
+  if (!text) return [];
+  const matches = [];
+  state.teams.forEach(team => {
+    team.riders.forEach(rider => {
+      if (matchRiderInText(rider, text)) matches.push({ rider, teamName: team.name });
+    });
+  });
+  return matches;
+}
+
+function showTab(tabName) {
+  document.querySelectorAll("nav button[data-tab]").forEach(btn => btn.classList.toggle("active", btn.dataset.tab === tabName));
+  document.querySelectorAll(".tab").forEach(tab => tab.classList.remove("active"));
+  const tab = document.querySelector(`#tab-${tabName}`);
+  if (tab) tab.classList.add("active");
+}
+
+function renderTeams() {
+  const grid = $("teams-grid");
+  if (!state.teams.length) {
+    grid.innerHTML = '<div class="card" style="grid-column:1/-1"><div class="empty">Je hebt nog geen teams geïmporteerd.</div></div>';
+    return;
+  }
+  grid.innerHTML = state.teams.map((team, index) => {
+    const cls = ["t1","t2","t3"][index % 3] || "t1";
+    const ridersHtml = team.riders.map(rider => {
+      const points = state.results.filter(result => sameRiderName(result.riderName, rider)).reduce((sum, item) => sum + (item.points || 0), 0);
+      return `<div class="rrow"><span class="rname">${escapeHtml(rider)}</span><span class="rpts">${points || ""}</span></div>`;
+    }).join("");
+    return `
+      <div class="card">
+        <div class="thead ${cls}"><span>${escapeHtml(team.name)}</span><span class="tpts">${totalTeamPoints(team)} pts</span></div>
+        <div class="team-meta">${team.riders.length} renners</div>
+        ${ridersHtml}
+        <div class="rrow"><button class="bd" onclick="deleteTeam('${team.id}')">Verwijderen</button></div>
+      </div>`;
+  }).join("");
+}
+
+function renderRaces() {
+  const tbody = $("races-tbody");
+  tbody.innerHTML = state.races.map((race, index) => {
+    const matches = raceMatchesForUser(race);
+    const startlistStatus = race.startlistText ? '<span class="badge ok">Ingevuld</span>' : '<span class="badge">Leeg</span>';
+    const mine = matches.length ? `<span class="badge ok">${matches.length}</span>` : '<span class="badge">0</span>';
+    return `
+      <tr class="crow" onclick="openRaceMatches('${race.id}')">
+        <td style="color:var(--muted);font-size:12px">${index + 1}</td>
+        <td style="font-weight:500">${escapeHtml(race.name)}</td>
+        <td><span class="rt ${getRaceCss(race.type)}">${escapeHtml(race.type)}</span></td>
+        <td style="color:var(--muted);font-size:12px">${escapeHtml(race.date || "")}</td>
+        <td>${startlistStatus}</td>
+        <td>${mine}</td>
+      </tr>`;
+  }).join("") || '<tr><td colspan="6" class="empty">Nog geen wedstrijden.</td></tr>';
+}
+
+function renderScores() {
+  const board = $("scoreboard");
+  if (!state.teams.length) {
+    board.innerHTML = '<div class="card" style="grid-column:1/-1"><div class="empty">Importeer eerst je teams.</div></div>';
+  } else {
+    board.innerHTML = state.teams.map((team, index) => {
+      const cls = ["t1","t2","t3"][index % 3] || "t1";
+      const grouped = {};
+      teamResults(team).forEach(item => grouped[item.raceName] = (grouped[item.raceName] || 0) + (item.points || 0));
+      const body = Object.entries(grouped).map(([raceName, points]) => `<div class="sr"><span>${escapeHtml(raceName)}</span><strong>${points}</strong></div>`).join("") || '<div class="sr" style="justify-content:center">Nog geen punten</div>';
+      return `<div class="card"><div class="sch ${cls}"><span>${escapeHtml(team.name)}</span><span class="sct">${totalTeamPoints(team)}</span></div><div class="scb">${body}</div></div>`;
+    }).join("");
+  }
+
+  const tbody = $("my-results-tbody");
+  const items = relevantResults();
+  tbody.innerHTML = items.map(item => {
+    const team = state.teams.find(t => t.riders.some(r => sameRiderName(r, item.riderName)));
+    const posLabel = item.position === "etappe" ? "Etappezege" : `No. ${item.position}`;
+    return `<tr><td style="font-weight:500">${escapeHtml(item.riderName)}</td><td style="color:var(--muted)">${escapeHtml(team?.name || "-")}</td><td>${escapeHtml(item.raceName)}</td><td style="color:var(--muted)">${escapeHtml(posLabel)}</td><td><span class="pts">+${item.points}</span></td></tr>`;
+  }).join("") || '<tr><td colspan="5" class="empty">Nog geen resultaten voor jouw renners.</td></tr>';
+}
+
+function renderAdmin() {
+  const racesTbody = $("admin-races-tbody");
+  racesTbody.innerHTML = state.races.map(race => {
+    const lineCount = (race.startlistText || "").split(/\n+/).map(v => v.trim()).filter(Boolean).length;
+    const status = lineCount ? `<span class="badge ok">${lineCount} regels</span>` : '<span class="badge">Leeg</span>';
+    return `<tr>
+      <td style="font-weight:500">${escapeHtml(race.name)}</td>
+      <td><span class="rt ${getRaceCss(race.type)}">${escapeHtml(race.type)}</span></td>
+      <td style="color:var(--muted);font-size:12px">${escapeHtml(race.date || "")}</td>
+      <td>${status}</td>
+      <td><button class="bx" onclick="editStartlist('${race.id}')">Startlijst</button></td>
+      <td><button class="bd" onclick="deleteRace('${race.id}')">Verwijderen</button></td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="6" class="empty">Nog geen wedstrijden.</td></tr>';
+
+  const raceSelect = $("result-race");
+  raceSelect.innerHTML = state.races.map(race => `<option value="${race.id}">${escapeHtml(race.name)}</option>`).join("") || '<option value="">Geen wedstrijden</option>';
+
+  const resultsTbody = $("admin-results-tbody");
+  resultsTbody.innerHTML = state.results.map(item => {
+    const posLabel = item.position === "etappe" ? "Etappezege" : `No. ${item.position}`;
+    return `<tr><td style="font-weight:500">${escapeHtml(item.riderName)}</td><td>${escapeHtml(item.raceName)}</td><td style="color:var(--muted)">${escapeHtml(posLabel)}</td><td><span class="pts">+${item.points}</span></td><td><button class="bd" onclick="deleteResult('${item.id}')">Verwijderen</button></td></tr>`;
+  }).join("") || '<tr><td colspan="5" class="empty">Nog geen resultaten.</td></tr>';
+}
+
+function renderAll() {
+  renderTeams();
+  renderRaces();
+  renderScores();
+  if (state.isAdmin) renderAdmin();
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function openModal(title, body) {
+  $("modal-title").innerHTML = title;
+  $("modal-body").innerHTML = body;
+  $("modal").classList.remove("hidden");
+}
+
+function closeModal() {
+  $("modal").classList.add("hidden");
+}
+
+function parseTeamImport(rawText) {
+  const normalized = String(rawText || "").replace(/\r/g, "").trim();
+  if (!normalized) return [];
+  const blocks = normalized.split(/\n\s*\n+/).map(block => block.trim()).filter(Boolean);
+  return blocks.map((block, idx) => {
+    const lines = block.split("\n").map(line => line.trim()).filter(Boolean);
+    if (lines.length < 2) return null;
+    return {
+      name: lines[0],
+      riders: Array.from(new Set(lines.slice(1)))
+    };
+  }).filter(Boolean);
+}
+
+async function upsertUserDoc(user) {
+  await setDoc(doc(db, "users", user.uid), {
+    displayName: user.displayName || "Gebruiker",
+    email: user.email || "",
+    lastLoginAt: serverTimestamp()
+  }, { merge: true });
+}
+
+async function checkAdmin(uid) {
+  const snap = await getDoc(doc(db, "admins", uid));
+  return snap.exists();
+}
+
+async function seedDefaultRaces() {
+  const existing = await getDocs(collection(db, "races"));
+  if (!existing.empty) {
+    toast("Kalender bestaat al");
+    return;
+  }
+  for (const race of DEFAULT_RACES) {
+    await addDoc(collection(db, "races"), {
+      ...race,
+      startlistText: "",
+      createdAt: serverTimestamp()
+    });
+  }
+  toast("Standaardkalender geladen");
+}
+
+function subscribeData(uid) {
+  cleanupListeners();
+
+  state.unsubs.push(onSnapshot(query(collection(db, "users", uid, "teams")), snap => {
+    state.teams = snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() })).sort((a,b) => (a.name || "").localeCompare(b.name || ""));
+    renderAll();
+  }));
+
+  state.unsubs.push(onSnapshot(query(collection(db, "races"), orderBy("sortOrder")), snap => {
+    state.races = snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+    renderAll();
+  }));
+
+  state.unsubs.push(onSnapshot(query(collection(db, "results"), orderBy("createdAt", "desc")), snap => {
+    state.results = snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+    renderAll();
+  }));
+}
+
+async function handleLoggedIn(user) {
+  state.user = user;
+  await upsertUserDoc(user);
+  state.isAdmin = await checkAdmin(user.uid);
+
+  $("user-name").textContent = user.displayName || user.email || "Gebruiker";
+  $("user-uid").textContent = user.uid;
+  $("admin-badge").classList.toggle("hidden", !state.isAdmin);
+  $("admin-tab-btn").classList.toggle("hidden", !state.isAdmin);
+  $("tab-admin").classList.toggle("hidden", !state.isAdmin);
+
+  if (!state.isAdmin && document.querySelector("nav button.active")?.dataset.tab === "admin") {
+    showTab("teams");
+  }
+
+  subscribeData(user.uid);
+  setAuthView(true);
+  hideLoader();
+}
+
+async function handleLoggedOut() {
+  cleanupListeners();
+  state.user = null;
+  state.isAdmin = false;
+  state.teams = [];
+  state.races = [];
+  state.results = [];
+  setAuthView(false);
+  hideLoader();
+}
+
+$("login-btn").addEventListener("click", async () => {
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (error) {
+    alert(`Inloggen mislukt: ${error.message}`);
+  }
+});
+
+$("logout-btn").addEventListener("click", async () => {
+  await signOut(auth);
+});
+
+$("modal-close").addEventListener("click", closeModal);
+$("modal").addEventListener("click", (e) => { if (e.target === $("modal")) closeModal(); });
+
+document.querySelectorAll("nav button[data-tab]").forEach(btn => {
+  btn.addEventListener("click", () => showTab(btn.dataset.tab));
+});
+
+$("import-teams-btn").addEventListener("click", () => {
+  openModal("Teams importeren", `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="helper">Plak hier één of meerdere teams. Formaat per blok: eerst de teamnaam, daaronder elke renner op een nieuwe regel. Zet een lege regel tussen teams.</div>
+      <div class="helper">Voorbeeld:<br><br><strong style="color:var(--text)">Team 1<br>Mathieu van der Poel<br>Jasper Philipsen<br><br>Team 2<br>Wout van Aert<br>Primož Roglič</strong></div>
+      <textarea id="teams-import-text" class="ta" placeholder="Plak hier je teams..."></textarea>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="bp" id="save-teams-import-btn">Importeren</button></div>
+    </div>
+  `);
+  $("save-teams-import-btn").addEventListener("click", async () => {
+    const parsed = parseTeamImport($("teams-import-text").value);
+    if (!parsed.length) {
+      alert("Geen geldige teams gevonden. Gebruik het formaat: teamnaam + renners, met een lege regel tussen teams.");
+      return;
+    }
+    for (const team of parsed) {
+      await addDoc(collection(db, "users", state.user.uid, "teams"), {
+        name: team.name,
+        riders: team.riders,
+        createdAt: serverTimestamp()
+      });
+    }
+    closeModal();
+    toast("Teams geïmporteerd");
+  });
+});
+
+$("seed-races-btn").addEventListener("click", async () => {
+  if (!state.isAdmin) return;
+  await seedDefaultRaces();
+});
+
+$("add-race-btn").addEventListener("click", async () => {
+  const name = $("race-name").value.trim();
+  const type = $("race-type").value;
+  const date = $("race-date").value.trim();
+  if (!name) {
+    alert("Vul een wedstrijdnaam in.");
+    return;
+  }
+  const nextOrder = state.races.length ? Math.max(...state.races.map(r => r.sortOrder || 0)) + 1 : 1;
+  await addDoc(collection(db, "races"), {
+    name, type, date,
+    sortOrder: nextOrder,
+    startlistText: "",
+    createdAt: serverTimestamp()
+  });
+  $("race-name").value = "";
+  $("race-date").value = "";
+  toast("Wedstrijd toegevoegd");
+});
+
+$("add-result-btn").addEventListener("click", async () => {
+  const riderName = $("result-rider").value.trim();
+  const raceId = $("result-race").value;
+  const position = $("result-position").value;
+  const race = state.races.find(r => r.id === raceId);
+  if (!riderName || !race) {
+    alert("Kies een wedstrijd en vul een renner in.");
+    return;
+  }
+  await addDoc(collection(db, "results"), {
+    riderName,
+    raceId: race.id,
+    raceName: race.name,
+    raceType: race.type,
+    position,
+    points: calculatePoints(race.type, position),
+    createdAt: serverTimestamp()
+  });
+  $("result-rider").value = "";
+  $("result-position").value = "1";
+  toast("Resultaat opgeslagen");
+});
+
+window.deleteTeam = async (teamId) => {
+  if (!confirm("Team verwijderen?")) return;
+  await deleteDoc(doc(db, "users", state.user.uid, "teams", teamId));
+  toast("Team verwijderd");
+};
+
+window.deleteRace = async (raceId) => {
+  if (!state.isAdmin || !confirm("Wedstrijd verwijderen?")) return;
+  await deleteDoc(doc(db, "races", raceId));
+  toast("Wedstrijd verwijderd");
+};
+
+window.deleteResult = async (resultId) => {
+  if (!state.isAdmin || !confirm("Resultaat verwijderen?")) return;
+  await deleteDoc(doc(db, "results", resultId));
+  toast("Resultaat verwijderd");
+};
+
+window.editStartlist = (raceId) => {
+  const race = state.races.find(r => r.id === raceId);
+  if (!race) return;
+  openModal(`Startlijst: ${escapeHtml(race.name)}`, `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="helper">Plak hier de volledige deelnemerslijst. Teamnamen, rugnummers, DNS-regels en extra tekst mogen blijven staan. De app filtert automatisch de renners van elke gebruiker.</div>
+      <textarea id="startlist-textarea" class="ta" placeholder="Plak hier de startlijst..."></textarea>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="bp" id="save-startlist-btn">Opslaan</button>
+        <button class="bx" id="clear-startlist-btn">Leegmaken</button>
+      </div>
+    </div>
+  `);
+  $("startlist-textarea").value = race.startlistText || "";
+  $("save-startlist-btn").addEventListener("click", async () => {
+    await updateDoc(doc(db, "races", raceId), { startlistText: $("startlist-textarea").value });
+    closeModal();
+    toast("Startlijst opgeslagen");
+  });
+  $("clear-startlist-btn").addEventListener("click", async () => {
+    await updateDoc(doc(db, "races", raceId), { startlistText: "" });
+    closeModal();
+    toast("Startlijst leeggemaakt");
+  });
+};
+
+window.openRaceMatches = (raceId) => {
+  const race = state.races.find(r => r.id === raceId);
+  if (!race) return;
+  if (!race.startlistText) {
+    openModal(`Starters: ${escapeHtml(race.name)}`, '<div class="empty">Er is nog geen startlijst ingevuld voor deze wedstrijd.</div>');
+    return;
+  }
+
+  const matches = [];
+  state.teams.forEach((team, index) => {
+    const cls = ["t1","t2","t3"][index % 3] || "tX";
+    team.riders.forEach(rider => {
+      if (matchRiderInText(rider, race.startlistText)) {
+        matches.push({ rider, teamName: team.name, cls });
+      }
+    });
+  });
+
+  let html = '<div class="helper" style="margin-bottom:14px">Alleen renners uit jouw eigen teams worden hieronder getoond.</div>';
+  if (!matches.length) {
+    html += '<div class="empty">Geen van jouw renners staat op deze startlijst.</div>';
+  } else {
+    html += `<p style="font-size:13px;color:var(--muted);margin-bottom:10px"><strong style="color:var(--accent);font-size:18px">${matches.length}</strong> van jouw renners starten in ${escapeHtml(race.name)}:</p>`;
+    html += '<div class="slist">';
+    matches.forEach(item => {
+      html += `<span class="chip ${item.cls}">${escapeHtml(item.rider)} <span style="opacity:.55;font-size:10px;margin-left:4px">${escapeHtml(item.teamName)}</span></span>`;
+    });
+    html += '</div>';
+  }
+  openModal(`Starters: ${escapeHtml(race.name)}`, html);
+};
+
+onAuthStateChanged(auth, async (user) => {
+  try {
+    if (user) await handleLoggedIn(user);
+    else await handleLoggedOut();
+  } catch (error) {
+    console.error(error);
+    alert(`Fout tijdens laden: ${error.message}`);
+    hideLoader();
+  }
+});
+</script>
+</body>
+</html>
