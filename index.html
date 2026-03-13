@@ -175,6 +175,7 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
         <button class="active" data-tab="teams">Mijn teams</button>
         <button data-tab="races">Wedstrijden</button>
         <button data-tab="scores">Puntenstand</button>
+        <button data-tab="overall">Algemeen</button>
         <button data-tab="admin" id="admin-tab-btn" class="hidden">Admin</button>
       </nav>
     </div>
@@ -208,6 +209,24 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
       </table>
     </section>
 
+    <section class="tab" id="tab-overall">
+  <div class="sec">Algemene puntenstand</div>
+  <div class="helper" style="margin-bottom:18px">
+    Hier zie je de totale puntenstand van alle deelnemers die zich hebben aangemeld.
+  </div>
+  <table class="restbl">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Deelnemer</th>
+        <th>Aantal teams</th>
+        <th>Totaal punten</th>
+      </tr>
+    </thead>
+    <tbody id="overall-tbody"></tbody>
+  </table>
+</section>
+    
     <section class="tab hidden" id="tab-admin">
       <div class="sec">Admin</div>
       <div class="toolbar">
@@ -284,10 +303,10 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
 import {
-  getFirestore, doc, setDoc, addDoc, updateDoc, deleteDoc,
-  collection, onSnapshot, query, orderBy, serverTimestamp, getDocs, where
+  getFirestore, doc, setDoc, getDoc, addDoc, updateDoc, deleteDoc,
+  collection, collectionGroup, onSnapshot, query, orderBy, serverTimestamp, getDocs
 } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
-
+  
 const firebaseConfig = {
   apiKey: "AIzaSyBCxSf3p7c1C195OPxB1r9zvvI6qtnYyW4",
   authDomain: "directeur-sportief-2026.firebaseapp.com",
@@ -355,6 +374,8 @@ const state = {
   teams: [],
   races: [],
   results: [],
+  allUsers: [],
+  allTeams: [],
   unsubs: []
 };
 
@@ -799,10 +820,49 @@ function renderAdmin() {
   }).join("") || '<tr><td colspan="5" class="empty">Nog geen resultaten.</td></tr>';
 }
 
+function buildOverallStandings() {
+  return state.allUsers.map(user => {
+    const userTeams = state.allTeams.filter(team => team.userId === user.id);
+
+    const totalPoints = userTeams.reduce((sum, team) => {
+      return sum + state.results
+        .filter(result => team.riders.some(rider => sameRiderName(rider, result.riderName)))
+        .reduce((teamSum, item) => teamSum + (item.points || 0), 0);
+    }, 0);
+
+    return {
+      id: user.id,
+      displayName: user.displayName || user.email || "Onbekende gebruiker",
+      teamCount: userTeams.length,
+      totalPoints
+    };
+  }).sort((a, b) => b.totalPoints - a.totalPoints || a.displayName.localeCompare(b.displayName));
+}
+
+function renderOverall() {
+  const tbody = $("overall-tbody");
+  const ranking = buildOverallStandings();
+
+  if (!ranking.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">Nog geen deelnemers gevonden.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = ranking.map((item, index) => `
+    <tr>
+      <td style="font-weight:700">${index + 1}</td>
+      <td style="font-weight:500">${escapeHtml(item.displayName)}</td>
+      <td style="color:var(--muted)">${item.teamCount}</td>
+      <td><span class="pts">+${item.totalPoints}</span></td>
+    </tr>
+  `).join("");
+}
+
 function renderAll() {
   renderTeams();
   renderRaces();
   renderScores();
+  renderOverall();
   if (state.isAdmin) renderAdmin();
 }
 
@@ -883,7 +943,8 @@ function subscribeData(uid) {
   }));
 
   state.unsubs.push(onSnapshot(query(collection(db, "users", uid, "teams")), snap => {
-    state.teams = snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
+    state.teams = snap.docs
+      .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
       .sort((a,b) => (a.name || "").localeCompare(b.name || ""));
     renderAll();
   }));
@@ -895,6 +956,27 @@ function subscribeData(uid) {
 
   state.unsubs.push(onSnapshot(query(collection(db, "results"), orderBy("createdAt", "desc")), snap => {
     state.results = snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+    renderAll();
+  }));
+
+  state.unsubs.push(onSnapshot(collection(db, "users"), snap => {
+    state.allUsers = snap.docs.map(docSnap => ({
+      id: docSnap.id,
+      ...docSnap.data()
+    }));
+    renderAll();
+  }));
+
+  state.unsubs.push(onSnapshot(collectionGroup(db, "teams"), snap => {
+    state.allTeams = snap.docs.map(docSnap => {
+      const data = docSnap.data();
+      const userId = docSnap.ref.parent.parent.id;
+      return {
+        id: docSnap.id,
+        userId,
+        ...data
+      };
+    });
     renderAll();
   }));
 }
