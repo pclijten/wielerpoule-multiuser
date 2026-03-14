@@ -210,23 +210,23 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
     </section>
 
     <section class="tab" id="tab-overall">
-  <div class="sec">Algemene puntenstand</div>
-  <div class="helper" style="margin-bottom:18px">
-    Hier zie je de totale puntenstand van alle deelnemers die zich hebben aangemeld.
-  </div>
-  <table class="restbl">
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Deelnemer</th>
-        <th>Aantal teams</th>
-        <th>Totaal punten</th>
-      </tr>
-    </thead>
-    <tbody id="overall-tbody"></tbody>
-  </table>
-</section>
-    
+      <div class="sec">Algemene puntenstand</div>
+      <div class="helper" style="margin-bottom:18px">
+        Hier zie je de totale puntenstand van alle deelnemers die zich hebben aangemeld.
+      </div>
+      <table class="restbl">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Deelnemer</th>
+            <th>Aantal teams</th>
+            <th>Totaal punten</th>
+          </tr>
+        </thead>
+        <tbody id="overall-tbody"></tbody>
+      </table>
+    </section>
+
     <section class="tab hidden" id="tab-admin">
       <div class="sec">Admin</div>
       <div class="toolbar">
@@ -274,9 +274,7 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
         <div class="frow">
           <div class="fg"><label>Renner</label><input id="result-rider" placeholder="Bijv. Mathieu van der Poel"></div>
           <div class="fg"><label>Wedstrijd</label><select id="result-race"></select></div>
-          <div class="fg"><label>Positie</label>
-            <select id="result-position"></select>
-          </div>
+          <div class="fg"><label>Positie</label><select id="result-position"></select></div>
           <button class="bp" id="add-result-btn">Opslaan</button>
         </div>
       </div>
@@ -303,10 +301,10 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
 import {
-  getFirestore, doc, setDoc, getDoc, addDoc, updateDoc, deleteDoc,
-  collection,  onSnapshot, query, where, orderBy, serverTimestamp, getDocs
+  getFirestore, doc, setDoc, addDoc, updateDoc, deleteDoc,
+  collection, onSnapshot, query, where, orderBy, serverTimestamp, getDocs
 } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
-  
+
 const firebaseConfig = {
   apiKey: "AIzaSyBCxSf3p7c1C195OPxB1r9zvvI6qtnYyW4",
   authDomain: "directeur-sportief-2026.firebaseapp.com",
@@ -380,6 +378,7 @@ const state = {
 };
 
 const $ = (id) => document.getElementById(id);
+
 const toast = (msg = "Opgeslagen") => {
   const t = $("toast");
   t.textContent = msg;
@@ -611,7 +610,6 @@ function previewImportedResults(items) {
     </table>
   `;
 }
-
 function getResultKind(result) {
   return result.resultKind || "final";
 }
@@ -695,18 +693,18 @@ function renderTeams() {
 
   grid.innerHTML = state.teams.map((team, index) => {
     const cls = ["t1","t2","t3"][index % 3] || "t1";
-const ridersHtml = team.riders.map(rider => {
-  const points = state.results
-    .filter(result => sameRiderName(result.riderName, rider))
-    .reduce((sum, item) => sum + (item.points || 0), 0);
+    const ridersHtml = team.riders.map(rider => {
+      const points = state.results
+        .filter(result => sameRiderName(result.riderName, rider))
+        .reduce((sum, item) => sum + (item.points || 0), 0);
 
-  return `
-    <div class="rrow rider-link" onclick="openRiderPoints('${encodeURIComponent(rider)}')">
-      <span class="rname">${escapeHtml(rider)}</span>
-      <span class="rpts">${points || ""}</span>
-    </div>
-  `;
-}).join("");
+      return `
+        <div class="rrow rider-link" onclick="openRiderPoints('${encodeURIComponent(rider)}')">
+          <span class="rname">${escapeHtml(rider)}</span>
+          <span class="rpts">${points || ""}</span>
+        </div>
+      `;
+    }).join("");
 
     return `
       <div class="card">
@@ -933,6 +931,24 @@ async function seedDefaultRaces() {
   toast("Standaardkalender geladen");
 }
 
+async function loadAllTeamsForOverall() {
+  const allTeams = [];
+
+  for (const user of state.allUsers) {
+    const teamSnap = await getDocs(collection(db, "users", user.id, "teams"));
+    teamSnap.forEach(docSnap => {
+      allTeams.push({
+        id: docSnap.id,
+        userId: user.id,
+        ...docSnap.data()
+      });
+    });
+  }
+
+  state.allTeams = allTeams;
+  renderAll();
+}
+
 function subscribeData(uid) {
   cleanupListeners();
 
@@ -959,34 +975,14 @@ function subscribeData(uid) {
     renderAll();
   }));
 
-state.unsubs.push(onSnapshot(collection(db, "users"), async snap => {
-  state.allUsers = snap.docs.map(docSnap => ({
-    id: docSnap.id,
-    ...docSnap.data()
-  }));
-  await loadAllTeamsForOverall();
-}));
-
-async function loadAllTeamsForOverall() {
-  const allTeams = [];
-
-  for (const user of state.allUsers) {
-    const teamSnap = await getDocs(collection(db, "users", user.id, "teams"));
-    teamSnap.forEach(docSnap => {
-      allTeams.push({
-        id: docSnap.id,
-        userId: user.id,
-        ...docSnap.data()
-      });
-    });
-  }
-
-  state.allTeams = allTeams;
-  renderAll();
-}
+  state.unsubs.push(onSnapshot(collection(db, "users"), async snap => {
+    state.allUsers = snap.docs.map(docSnap => ({
+      id: docSnap.id,
+      ...docSnap.data()
+    }));
+    await loadAllTeamsForOverall();
   }));
 }
-
 async function handleLoggedIn(user) {
   state.user = user;
   await upsertUserDoc(user);
@@ -1007,6 +1003,8 @@ async function handleLoggedOut() {
   state.teams = [];
   state.races = [];
   state.results = [];
+  state.allUsers = [];
+  state.allTeams = [];
   updateAdminUI();
   setAuthView(false);
   hideLoader();
@@ -1167,7 +1165,8 @@ window.editStartlist = (raceId) => {
     toast("Startlijst leeggemaakt");
   });
 };
-  window.editResultImport = (raceId) => {
+
+window.editResultImport = (raceId) => {
   const race = state.races.find(r => r.id === raceId);
   if (!race) return;
 
@@ -1303,7 +1302,6 @@ window.editStageImport = (raceId) => {
     $("stage-import-textarea").value = existing;
     $("stage-import-preview").innerHTML = previewImportedResults(parseImportedPositions(existing, maxPositions));
   };
-
   loadStageData();
 
   $("stage-number").addEventListener("change", loadStageData);
