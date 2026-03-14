@@ -25,12 +25,16 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 @keyframes lb{0%{width:0%;margin-left:0}50%{width:60%;margin-left:20%}100%{width:0%;margin-left:100%}}
 
 .auth-wrap{position:relative;z-index:2;min-height:100vh;display:grid;place-items:center;padding:32px}
-.auth-card{width:min(560px,100%);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:32px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.auth-card{width:min(640px,100%);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:32px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
 .auth-logo{font-family:'Bebas Neue',sans-serif;font-size:52px;color:var(--accent);letter-spacing:3px;line-height:1;margin-bottom:20px}
 .auth-logo span{color:var(--text);font-size:24px;display:block;letter-spacing:8px;margin-bottom:6px}
 .auth-card h1{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;color:var(--accent);margin-bottom:10px}
 .auth-card p{color:var(--muted);line-height:1.6;margin-bottom:20px}
 .auth-note{margin-top:14px;font-size:12px;color:var(--muted)}
+.auth-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.auth-col{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:18px}
+.auth-col h3{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;color:var(--accent);margin-bottom:12px}
+.auth-error{margin-top:10px;color:#ff9c9c;font-size:13px;min-height:18px}
 
 header{position:relative;z-index:10;padding:24px 32px 0;display:flex;align-items:flex-end;gap:24px;border-bottom:1px solid var(--border)}
 .logo{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:3px;line-height:1;color:var(--accent)}
@@ -119,9 +123,6 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
 .moc{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;transition:color .2s}
 .moc:hover{color:var(--text)}
 .mob{padding:24px}
-.loading{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:14px;padding:20px 0}
-.spin{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite}
-@keyframes sp{to{transform:rotate(360deg)}}
 .slist{display:flex;flex-wrap:wrap;gap:8px;padding-top:14px}
 .chip{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:6px 14px;font-size:13px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px}
 .chip.t1{border-left:3px solid var(--t1)}.chip.t2{border-left:3px solid var(--t2)}.chip.t3{border-left:3px solid var(--t3)}.chip.tX{border-left:3px solid var(--accent)}
@@ -136,6 +137,7 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
   .top-right{width:100%;justify-content:space-between}
   nav{width:100%;overflow-x:auto}
   .logo{font-size:38px}
+  .auth-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -150,9 +152,36 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
   <div class="auth-card">
     <div class="auth-logo"><span>Directeur Sportief</span>2026</div>
     <h1>Multi-user wielerpoule</h1>
-    <p>Iedere gebruiker logt in met zijn eigen account, importeert zijn eigen teams en ziet daarna alleen zijn eigen renners terug bij startlijsten en in de puntenstand.</p>
-    <button class="bp" id="login-btn">Inloggen met Google</button>
-    <div class="auth-note">Tip: zet Google login aan in Firebase Authentication. Dit is de makkelijkste route voor jouw gebruikers.</div>
+    <p>Log in met Google of met e-mail en wachtwoord.</p>
+
+    <div class="auth-grid">
+      <div class="auth-col">
+        <h3>Google login</h3>
+        <p>Voor snelle toegang met bestaand Google-account.</p>
+        <button class="bp" id="google-login-btn">Inloggen met Google</button>
+      </div>
+
+      <div class="auth-col">
+        <h3>E-mail login</h3>
+        <div class="fg">
+          <label>E-mail</label>
+          <input id="login-email" type="email" placeholder="naam@voorbeeld.nl">
+        </div>
+        <div class="fg" style="margin-top:10px">
+          <label>Wachtwoord</label>
+          <input id="login-password" type="password" placeholder="Wachtwoord">
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+          <button class="bp" id="login-btn">Inloggen</button>
+          <button class="bx" id="forgot-password-btn" type="button">Reset wachtwoord</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="auth-error" id="auth-error"></div>
+    <div class="auth-note">
+      Accounts aanmaken doe je veilig in Firebase Authentication. De admin-pagina hieronder helpt bij beheer, maar maakt niet direct auth-accounts aan vanuit de browser.
+    </div>
   </div>
 </div>
 
@@ -229,7 +258,35 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
 
     <section class="tab hidden" id="tab-admin">
       <div class="sec">Admin</div>
-      <div class="toolbar">
+
+      <div class="form-card">
+        <h3>Gebruikersbeheer</h3>
+        <div class="helper" style="margin-bottom:16px">
+          Maak nieuwe gebruikers aan in <strong>Firebase Authentication → Users → Add user</strong>.<br>
+          Deze pagina helpt je met beheer en communicatie, maar maakt geen auth-accounts direct aan vanuit de browser.
+        </div>
+
+        <div class="frow" style="grid-template-columns:1fr 1fr auto">
+          <div class="fg">
+            <label>E-mail voor resetmail</label>
+            <input id="admin-reset-email" placeholder="deelnemer@voorbeeld.nl">
+          </div>
+          <div class="fg">
+            <label>Tijdelijk wachtwoord (alleen ter notitie)</label>
+            <input id="admin-temp-password" placeholder="Bijv. Welkom01">
+          </div>
+          <button class="bp" id="admin-copy-login-btn">Kopieer logintekst</button>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+          <button class="bx" id="admin-send-reset-btn">Stuur resetmail</button>
+        </div>
+
+        <div class="helper" id="admin-user-help" style="margin-top:14px">
+          Werkwijze: maak eerst de gebruiker aan in Firebase Console, stuur daarna de logintekst of een resetmail.
+        </div>
+      </div>
+            <div class="toolbar">
         <button class="bp" id="seed-races-btn">Standaardkalender laden</button>
       </div>
 
@@ -299,7 +356,15 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  onAuthStateChanged,
+  signOut
+} from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
 import {
   getFirestore, doc, setDoc, addDoc, updateDoc, deleteDoc,
   collection, onSnapshot, query, where, orderBy, serverTimestamp, getDocs
@@ -378,11 +443,16 @@ const state = {
 };
 
 const $ = (id) => document.getElementById(id);
+
 const toast = (msg = "Opgeslagen") => {
   const t = $("toast");
   t.textContent = msg;
   t.classList.add("show");
   setTimeout(() => t.classList.remove("show"), 2200);
+};
+
+const setAuthError = (msg = "") => {
+  $("auth-error").textContent = msg;
 };
 
 const hideLoader = () => {
@@ -510,7 +580,6 @@ function buildPositionOptions() {
     return `<option value="${pos}">${pos}e plaats</option>`;
   }).join("");
 }
-
 function getRaceCss(type) {
   return {Monument:"monument","Grote Ronde":"grande",Rittenkoers:"rit",Divers:"divers"}[type] || "";
 }
@@ -522,10 +591,7 @@ function calculatePoints(type, position, resultKind = "final") {
   const index = parseInt(position, 10) - 1;
   if (Number.isNaN(index) || index < 0) return 0;
 
-  if (resultKind === "stage") {
-    return table.stage?.[index] || 0;
-  }
-
+  if (resultKind === "stage") return table.stage?.[index] || 0;
   return table.final?.[index] || 0;
 }
 
@@ -550,7 +616,8 @@ function looksLikeRiderName(value) {
 
   return true;
 }
-  function parseImportedPositions(text, maxPositions) {
+
+function parseImportedPositions(text, maxPositions) {
   const lines = String(text || "")
     .replace(/\r/g, "")
     .split("\n")
@@ -590,9 +657,7 @@ function looksLikeRiderName(value) {
 }
 
 function previewImportedResults(items) {
-  if (!items.length) {
-    return '<div class="empty">Geen geldige uitslag gevonden.</div>';
-  }
+  if (!items.length) return '<div class="empty">Geen geldige uitslag gevonden.</div>';
 
   return `
     <table class="restbl">
@@ -883,7 +948,7 @@ function parseTeamImport(rawText) {
 
 async function upsertUserDoc(user) {
   await setDoc(doc(db, "users", user.uid), {
-    displayName: user.displayName || "Gebruiker",
+    displayName: user.displayName || user.email || "Gebruiker",
     email: user.email || "",
     lastLoginAt: serverTimestamp()
   }, { merge: true });
@@ -969,6 +1034,7 @@ function subscribeData(uid) {
     await loadAllTeamsForOverall();
   }));
 }
+
 async function handleLoggedIn(user) {
   state.user = user;
   await upsertUserDoc(user);
@@ -978,6 +1044,7 @@ async function handleLoggedIn(user) {
 
   updateAdminUI();
   subscribeData(user.uid);
+  setAuthError("");
   setAuthView(true);
   hideLoader();
 }
@@ -996,11 +1063,80 @@ async function handleLoggedOut() {
   hideLoader();
 }
 
-$("login-btn").addEventListener("click", async () => {
+$("google-login-btn").addEventListener("click", async () => {
   try {
+    setAuthError("");
     await signInWithPopup(auth, provider);
   } catch (error) {
-    alert(`Inloggen mislukt: ${error.message}`);
+    console.error(error);
+    setAuthError("Google login mislukt.");
+  }
+});
+
+$("login-btn").addEventListener("click", async () => {
+  const email = $("login-email").value.trim();
+  const password = $("login-password").value;
+
+  if (!email || !password) {
+    setAuthError("Vul e-mail en wachtwoord in.");
+    return;
+  }
+
+  try {
+    setAuthError("");
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch (error) {
+    console.error(error);
+    setAuthError("Inloggen met e-mail is mislukt.");
+  }
+});
+
+$("forgot-password-btn").addEventListener("click", async () => {
+  const email = $("login-email").value.trim();
+
+  if (!email) {
+    setAuthError("Vul eerst een e-mailadres in.");
+    return;
+  }
+
+  try {
+    await sendPasswordResetEmail(auth, email);
+    setAuthError("");
+    toast("Resetmail verzonden");
+  } catch (error) {
+    console.error(error);
+    setAuthError("Resetmail versturen is mislukt.");
+  }
+});
+
+$("admin-copy-login-btn").addEventListener("click", async () => {
+  const email = $("admin-reset-email").value.trim();
+  const password = $("admin-temp-password").value.trim();
+
+  const text = `Hallo,\n\nJe account voor Directeur Sportief 2026 is aangemaakt.\n\nE-mail: ${email || "[vul e-mail in]"}\nTijdelijk wachtwoord: ${password || "[vul wachtwoord in]"}\n\nLogin via de app. Daarna kun je via "Reset wachtwoord" zelf een nieuw wachtwoord instellen.\n`;
+
+  try {
+    await navigator.clipboard.writeText(text);
+    toast("Logintekst gekopieerd");
+  } catch (error) {
+    console.error(error);
+    $("admin-user-help").textContent = text;
+  }
+});
+
+$("admin-send-reset-btn").addEventListener("click", async () => {
+  const email = $("admin-reset-email").value.trim();
+  if (!email) {
+    alert("Vul eerst een e-mailadres in.");
+    return;
+  }
+
+  try {
+    await sendPasswordResetEmail(auth, email);
+    toast("Resetmail verzonden");
+  } catch (error) {
+    console.error(error);
+    alert("Resetmail versturen is mislukt.");
   }
 });
 
@@ -1110,12 +1246,6 @@ window.deleteTeam = async (teamId) => {
   toast("Team verwijderd");
 };
 
-window.deleteRace = async (raceId) => {
-  if (!state.isAdmin || !confirm("Wedstrijd verwijderen?")) return;
-  await deleteDoc(doc(db, "races", raceId));
-  toast("Wedstrijd verwijderd");
-};
-
 window.deleteResult = async (resultId) => {
   if (!state.isAdmin || !confirm("Resultaat verwijderen?")) return;
   await deleteDoc(doc(db, "results", resultId));
@@ -1128,7 +1258,7 @@ window.editStartlist = (raceId) => {
 
   openModal(`Startlijst: ${escapeHtml(race.name)}`, `
     <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="helper">Plak hier de volledige deelnemerslijst. Teamnamen, rugnummers, DNS-regels en extra tekst mogen blijven staan. De app filtert automatisch de renners van elke gebruiker.</div>
+      <div class="helper">Plak hier de volledige deelnemerslijst. Teamnamen, rugnummers, DNS-regels en extra tekst mogen blijven staan.</div>
       <textarea id="startlist-textarea" class="ta" placeholder="Plak hier de startlijst..."></textarea>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="bp" id="save-startlist-btn">Opslaan</button>
@@ -1252,7 +1382,7 @@ window.editStageImport = (raceId) => {
 
   openModal(`Etappe importeren: ${escapeHtml(race.name)}`, `
     <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="helper">Plak hier de etappe-uitslag. De eerste ${maxPositions} plaatsen krijgen punten: 70 / 50 / 35 / 20 / 15.</div>
+      <div class="helper">Plak hier de etappe-uitslag. De eerste ${maxPositions} plaatsen krijgen punten.</div>
       <div class="fg" style="max-width:180px">
         <label>Etappenummer</label>
         <input id="stage-number" type="number" min="1" value="${suggestedStage}">
@@ -1357,10 +1487,7 @@ window.openRiderPoints = (encodedRiderName) => {
     });
 
   if (!riderResults.length) {
-    openModal(
-      `Punten: ${escapeHtml(riderName)}`,
-      `<div class="empty">${escapeHtml(riderName)} heeft nog geen punten gescoord.</div>`
-    );
+    openModal(`Punten: ${escapeHtml(riderName)}`, `<div class="empty">${escapeHtml(riderName)} heeft nog geen punten gescoord.</div>`);
     return;
   }
 
@@ -1373,10 +1500,8 @@ window.openRiderPoints = (encodedRiderName) => {
     if (item.resultKind === "stage") {
       wedstrijdLabel = `${wedstrijdLabel} - etappe ${item.stageNumber}`;
       positieLabel = `Etappe ${item.stageNumber} - no. ${item.position}`;
-    } else if (item.resultKind === "final") {
-      if (item.raceType === "Rittenkoers" || item.raceType === "Grote Ronde") {
-        wedstrijdLabel = `${wedstrijdLabel} - eindklassement`;
-      }
+    } else if (item.resultKind === "final" && (item.raceType === "Rittenkoers" || item.raceType === "Grote Ronde")) {
+      wedstrijdLabel = `${wedstrijdLabel} - eindklassement`;
     }
 
     return `
@@ -1396,13 +1521,7 @@ window.openRiderPoints = (encodedRiderName) => {
         <div class="badge ok">Totaal ${totalPoints} pts</div>
       </div>
       <table class="restbl">
-        <thead>
-          <tr>
-            <th>Wedstrijd</th>
-            <th>Positie</th>
-            <th>Punten</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Wedstrijd</th><th>Positie</th><th>Punten</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `
@@ -1458,4 +1577,4 @@ onAuthStateChanged(auth, async (user) => {
 });
 </script>
 </body>
-</html>  
+</html>
