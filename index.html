@@ -378,7 +378,6 @@ const state = {
 };
 
 const $ = (id) => document.getElementById(id);
-
 const toast = (msg = "Opgeslagen") => {
   const t = $("toast");
   t.textContent = msg;
@@ -551,8 +550,7 @@ function looksLikeRiderName(value) {
 
   return true;
 }
-
-function parseImportedPositions(text, maxPositions) {
+  function parseImportedPositions(text, maxPositions) {
   const lines = String(text || "")
     .replace(/\r/g, "")
     .split("\n")
@@ -610,37 +608,27 @@ function previewImportedResults(items) {
     </table>
   `;
 }
+
 function getResultKind(result) {
   return result.resultKind || "final";
 }
 
 function getResultLabel(result) {
   const kind = getResultKind(result);
-  if (kind === "stage") {
-    return `${result.raceName} - etappe ${result.stageNumber}`;
-  }
+  if (kind === "stage") return `${result.raceName} - etappe ${result.stageNumber}`;
   return `${result.raceName} - eindklassement`;
 }
 
 function getPositionLabel(result) {
   const kind = getResultKind(result);
-  if (kind === "stage") {
-    return `Etappe ${result.stageNumber} - no. ${result.position}`;
-  }
+  if (kind === "stage") return `Etappe ${result.stageNumber} - no. ${result.position}`;
   return `No. ${result.position}`;
 }
 
 function countRaceResults(raceId, resultKind = "all") {
   const items = state.results.filter(result => result.raceId === raceId);
-
-  if (resultKind === "final") {
-    return items.filter(result => getResultKind(result) === "final").length;
-  }
-
-  if (resultKind === "stage") {
-    return items.filter(result => getResultKind(result) === "stage").length;
-  }
-
+  if (resultKind === "final") return items.filter(result => getResultKind(result) === "final").length;
+  if (resultKind === "stage") return items.filter(result => getResultKind(result) === "stage").length;
   return items.length;
 }
 
@@ -805,17 +793,15 @@ function renderAdmin() {
   raceSelect.innerHTML = state.races.map(race => `<option value="${race.id}">${escapeHtml(race.name)}</option>`).join("") || '<option value="">Geen wedstrijden</option>';
 
   const resultsTbody = $("admin-results-tbody");
-  resultsTbody.innerHTML = state.results.map(item => {
-    return `
-      <tr>
-        <td style="font-weight:500">${escapeHtml(item.riderName)}</td>
-        <td>${escapeHtml(getResultLabel(item))}</td>
-        <td style="color:var(--muted)">${escapeHtml(getPositionLabel(item))}</td>
-        <td><span class="pts">+${item.points}</span></td>
-        <td><button class="bd" onclick="deleteResult('${item.id}')">Verwijderen</button></td>
-      </tr>
-    `;
-  }).join("") || '<tr><td colspan="5" class="empty">Nog geen resultaten.</td></tr>';
+  resultsTbody.innerHTML = state.results.map(item => `
+    <tr>
+      <td style="font-weight:500">${escapeHtml(item.riderName)}</td>
+      <td>${escapeHtml(getResultLabel(item))}</td>
+      <td style="color:var(--muted)">${escapeHtml(getPositionLabel(item))}</td>
+      <td><span class="pts">+${item.points}</span></td>
+      <td><button class="bd" onclick="deleteResult('${item.id}')">Verwijderen</button></td>
+    </tr>
+  `).join("") || '<tr><td colspan="5" class="empty">Nog geen resultaten.</td></tr>';
 }
 
 function buildOverallStandings() {
@@ -1267,20 +1253,16 @@ window.editStageImport = (raceId) => {
   openModal(`Etappe importeren: ${escapeHtml(race.name)}`, `
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="helper">Plak hier de etappe-uitslag. De eerste ${maxPositions} plaatsen krijgen punten: 70 / 50 / 35 / 20 / 15.</div>
-
       <div class="fg" style="max-width:180px">
         <label>Etappenummer</label>
         <input id="stage-number" type="number" min="1" value="${suggestedStage}">
       </div>
-
       <textarea id="stage-import-textarea" class="ta" placeholder="Plak hier de etappe-uitslag..."></textarea>
-
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="bx" id="preview-stage-btn">Voorbeeld</button>
         <button class="bp" id="save-stage-btn">Opslaan etappe</button>
         <button class="bx" id="clear-stage-btn">Verwijder etappe</button>
       </div>
-
       <div id="stage-import-preview"></div>
     </div>
   `);
@@ -1302,7 +1284,7 @@ window.editStageImport = (raceId) => {
     $("stage-import-textarea").value = existing;
     $("stage-import-preview").innerHTML = previewImportedResults(parseImportedPositions(existing, maxPositions));
   };
-  
+
   loadStageData();
 
   $("stage-number").addEventListener("change", loadStageData);
@@ -1362,6 +1344,7 @@ window.editStageImport = (raceId) => {
     toast(`Etappe ${stageNumber} verwijderd`);
   });
 };
+
 window.openRiderPoints = (encodedRiderName) => {
   const riderName = decodeURIComponent(encodedRiderName);
 
@@ -1412,7 +1395,6 @@ window.openRiderPoints = (encodedRiderName) => {
         <div class="helper">Overzicht van alle behaalde punten van deze renner.</div>
         <div class="badge ok">Totaal ${totalPoints} pts</div>
       </div>
-
       <table class="restbl">
         <thead>
           <tr>
@@ -1421,13 +1403,12 @@ window.openRiderPoints = (encodedRiderName) => {
             <th>Punten</th>
           </tr>
         </thead>
-        <tbody>
-          ${rows}
-        </tbody>
+        <tbody>${rows}</tbody>
       </table>
     `
   );
 };
+
 window.openRaceMatches = (raceId) => {
   const race = state.races.find(r => r.id === raceId);
   if (!race) return;
@@ -1477,4 +1458,4 @@ onAuthStateChanged(auth, async (user) => {
 });
 </script>
 </body>
-</html>
+</html>  
