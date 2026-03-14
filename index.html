@@ -304,7 +304,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebas
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
 import {
   getFirestore, doc, setDoc, getDoc, addDoc, updateDoc, deleteDoc,
-  collection, collectionGroup, onSnapshot, query, where, orderBy, serverTimestamp, getDocs
+  collection,  onSnapshot, query, where, orderBy, serverTimestamp, getDocs
 } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
   
 const firebaseConfig = {
@@ -959,25 +959,31 @@ function subscribeData(uid) {
     renderAll();
   }));
 
-  state.unsubs.push(onSnapshot(collection(db, "users"), snap => {
-    state.allUsers = snap.docs.map(docSnap => ({
-      id: docSnap.id,
-      ...docSnap.data()
-    }));
-    renderAll();
+state.unsubs.push(onSnapshot(collection(db, "users"), async snap => {
+  state.allUsers = snap.docs.map(docSnap => ({
+    id: docSnap.id,
+    ...docSnap.data()
   }));
+  await loadAllTeamsForOverall();
+}));
 
-  state.unsubs.push(onSnapshot(collectionGroup(db, "teams"), snap => {
-    state.allTeams = snap.docs.map(docSnap => {
-      const data = docSnap.data();
-      const userId = docSnap.ref.parent.parent.id;
-      return {
+async function loadAllTeamsForOverall() {
+  const allTeams = [];
+
+  for (const user of state.allUsers) {
+    const teamSnap = await getDocs(collection(db, "users", user.id, "teams"));
+    teamSnap.forEach(docSnap => {
+      allTeams.push({
         id: docSnap.id,
-        userId,
-        ...data
-      };
+        userId: user.id,
+        ...docSnap.data()
+      });
     });
-    renderAll();
+  }
+
+  state.allTeams = allTeams;
+  renderAll();
+}
   }));
 }
 
