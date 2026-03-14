@@ -1302,6 +1302,7 @@ window.editStageImport = (raceId) => {
     $("stage-import-textarea").value = existing;
     $("stage-import-preview").innerHTML = previewImportedResults(parseImportedPositions(existing, maxPositions));
   };
+  
   loadStageData();
 
   $("stage-number").addEventListener("change", loadStageData);
