@@ -594,74 +594,69 @@ $("fetch-news-btn").addEventListener("click", fetchRiderNews);
 
 async function fetchRiderNews() {
   const container = $("news-container");
-  container.innerHTML = '<div class="news-spinner"><div class="spin"></div> Nieuws ophalen...</div>';
-
   const allRiders = [...new Set(state.teams.flatMap(t => t.riders))];
 
-  const feeds = [
-    { url: "https://www.wielerflits.nl/feed/", label: "Wielerflits" },
-    { url: "https://www.procyclingstats.com/news/rss", label: "PCS" },
-    { url: "https://www.velonews.com/feed/", label: "VeloNews" },
-  ];
-
-  let allItems = [];
-
-  for (const feed of feeds) {
-    try {
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(feed.url)}`;
-      const res = await fetch(proxyUrl);
-      const text = await res.text();
-      const xml = new DOMParser().parseFromString(text, "text/xml");
-      const items = [...xml.querySelectorAll("item")];
-
-      items.forEach(item => {
-        const title = item.querySelector("title")?.textContent || "";
-        const link = item.querySelector("link")?.textContent || "";
-        const pubDate = item.querySelector("pubDate")?.textContent || "";
-        const description = item.querySelector("description")?.textContent?.replace(/<[^>]*>/g, "") || "";
-
-        if (title && link) {
-          allItems.push({ title, link, pubDate, description, source: feed.label });
-        }
-      });
-    } catch (e) {
-      console.warn("Feed mislukt:", feed.url, e);
-    }
-  }
-
-  if (!allItems.length) {
-    container.innerHTML = '<div class="empty">Geen nieuws opgehaald. Probeer het opnieuw.</div>';
+  if (!allRiders.length) {
+    container.innerHTML = '<div class="empty">Importeer eerst teams voordat je nieuws ophaalt.</div>';
     return;
   }
 
-  allItems.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+  container.innerHTML = '<div class="news-spinner"><div class="spin"></div> Nieuws zoeken via AI...</div>';
 
-  function findMatchingRiders(item) {
-    const text = `${item.title} ${item.description}`;
-    return allRiders.filter(rider => matchRiderInText(rider, text));
+  const riderList = allRiders.slice(0, 30).join(", ");
+  const today = new Date().toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
+        system: `Je bent een wielrennieuwsassistent. Vandaag is het ${today}. Geef altijd een JSON-array terug met nieuwsitems, NOOIT andere tekst. Formaat: [{"title":"...","url":"...","date":"...","riders":["naam1"],"source":"..."}]`,
+        messages: [{
+          role: "user",
+          content: `Zoek het allerlaatste wielrennieuw (vandaag of deze week) over deze renners: ${riderList}. Geef maximaal 20 artikelen terug als JSON-array. Elk item heeft: title, url, date (dd-mm-yyyy), riders (array van namen uit de lijst die in het artikel voorkomen), source (naam van website).`
+        }]
+      })
+    });
+
+    const data = await response.json();
+
+    // Haal de tekst op uit de response
+    const textBlock = data.content?.find(b => b.type === "text");
+    const raw = textBlock?.text || "";
+
+    // Parse JSON uit de response
+    const jsonMatch = raw.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) throw new Error("Geen JSON gevonden in response");
+
+    const items = JSON.parse(jsonMatch[0]);
+
+    if (!items.length) {
+      container.innerHTML = '<div class="empty">Geen recent nieuws gevonden voor jouw renners.</div>';
+      return;
+    }
+
+    container.innerHTML = items.map(item => {
+      const hasRiders = item.riders?.length > 0;
+      const riderTags = (item.riders || [])
+        .map(r => `<span class="news-rider-tag">${escapeHtml(r)}</span>`)
+        .join("");
+
+      return `
+        <div class="news-item ${hasRiders ? "highlight" : ""}">
+          <a href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>
+          <div class="news-meta">${escapeHtml(item.source || "")}${item.date ? " · " + escapeHtml(item.date) : ""}</div>
+          ${riderTags ? `<div class="news-riders">${riderTags}</div>` : ""}
+        </div>`;
+    }).join("");
+
+  } catch (e) {
+    console.error(e);
+    container.innerHTML = '<div class="empty">Nieuws ophalen mislukt. Probeer het opnieuw.</div>';
   }
-
-  const html = allItems.map(item => {
-    const matchedRiders = findMatchingRiders(item);
-    const isHighlight = matchedRiders.length > 0;
-    const pubDate = new Date(item.pubDate);
-    const dateStr = isNaN(pubDate)
-      ? ""
-      : pubDate.toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-
-    const riderTags = matchedRiders
-      .map(r => `<span class="news-rider-tag">${escapeHtml(r)}</span>`)
-      .join("");
-
-    return `
-      <div class="news-item ${isHighlight ? "highlight" : ""}">
-        <a href="${escapeHtml(item.link)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>
-        <div class="news-meta">${escapeHtml(item.source)}${dateStr ? " · " + dateStr : ""}</div>
-        ${riderTags ? `<div class="news-riders">${riderTags}</div>` : ""}
-      </div>`;
-  }).join("");
-
-  container.innerHTML = html;
 }
 function buildPositionOptions() {
   const select = $("result-position");
