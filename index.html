@@ -139,6 +139,14 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
   .logo{font-size:38px}
   .auth-grid{grid-template-columns:1fr}
 }
+.news-item{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px 20px;margin-bottom:10px;transition:border-color .2s}
+.news-item.highlight{border-color:var(--accent);background:rgba(232,180,34,.06)}
+.news-item a{color:var(--text);text-decoration:none;font-weight:500;font-size:14px;line-height:1.4}
+.news-item a:hover{color:var(--accent)}
+.news-meta{font-size:11px;color:var(--muted);margin-top:6px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px}
+.news-riders{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.news-rider-tag{background:rgba(232,180,34,.15);color:var(--accent);font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:1px;padding:2px 8px;border-radius:2px}
+.news-spinner{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:14px;padding:20px} 
 </style>
 </head>
 <body>
@@ -205,6 +213,7 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
         <button data-tab="races">Wedstrijden</button>
         <button data-tab="scores">Puntenstand</button>
         <button data-tab="overall">Klassement</button>
+        <button data-tab="nieuws">Nieuws</button>
         <button data-tab="admin" id="admin-tab-btn" class="hidden">Admin</button>
       </nav>
     </div>
@@ -255,6 +264,17 @@ main{position:relative;z-index:1;padding:32px;max-width:1400px;margin:0 auto}
         <tbody id="overall-tbody"></tbody>
       </table>
     </section>
+
+    <section class="tab" id="tab-nieuws">
+  <div class="sec">Renner nieuws</div>
+  <div class="toolbar">
+    <button class="bp" id="fetch-news-btn">Nieuws laden</button>
+    <span class="helper" style="align-self:center">Filtert automatisch op jouw renners — overig nieuws staat er grijs bij.</span>
+  </div>
+  <div id="news-container">
+    <div class="empty">Klik op "Nieuws laden" om het laatste wielrennieuw op te halen.</div>
+  </div>
+</section>
 
     <section class="tab hidden" id="tab-admin">
       <div class="sec">Admin</div>
@@ -570,7 +590,71 @@ function getMaxFinalPositions(type) {
 function getMaxStagePositions(type) {
   return POINTS_TABLE[type]?.stage?.length || 0;
 }
+$("fetch-news-btn").addEventListener("click", fetchRiderNews);
 
+async function fetchRiderNews() {
+  const container = $("news-container");
+  container.innerHTML = '<div class="news-spinner"><div class="spin"></div> Nieuws ophalen...</div>';
+
+  const allRiders = [...new Set(state.teams.flatMap(t => t.riders))];
+
+  const feeds = [
+    "https://www.wielerflits.nl/feed/",
+    "https://www.cyclingnews.com/rss/",
+  ];
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let allItems = [];
+
+  for (const feedUrl of feeds) {
+    try {
+      const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}&count=40`;
+      const res = await fetch(apiUrl);
+      const data = await res.json();
+      if (data.status === "ok" && data.items) {
+        allItems = allItems.concat(data.items.map(item => ({ ...item, source: data.feed.title })));
+      }
+    } catch (e) {
+      console.warn("Feed mislukt:", feedUrl, e);
+    }
+  }
+
+  if (!allItems.length) {
+    container.innerHTML = '<div class="empty">Geen nieuws opgehaald. Probeer het opnieuw.</div>';
+    return;
+  }
+
+  // Sorteer op datum, nieuwste eerst
+  allItems.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+
+  // Vind renners per artikel
+  function findMatchingRiders(item) {
+    const text = `${item.title} ${item.description || ""}`;
+    return allRiders.filter(rider => matchRiderInText(rider, text));
+  }
+
+  const html = allItems.map(item => {
+    const matchedRiders = findMatchingRiders(item);
+    const isHighlight = matchedRiders.length > 0;
+    const pubDate = new Date(item.pubDate);
+    const dateStr = pubDate.toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+    const riderTags = matchedRiders.map(r =>
+      `<span class="news-rider-tag">${escapeHtml(r)}</span>`
+    ).join("");
+
+    return `
+      <div class="news-item ${isHighlight ? "highlight" : ""}">
+        <a href="${escapeHtml(item.link)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>
+        <div class="news-meta">${escapeHtml(item.source)} · ${dateStr}</div>
+        ${riderTags ? `<div class="news-riders">${riderTags}</div>` : ""}
+      </div>`;
+  }).join("");
+
+  container.innerHTML = html;
+}
 function buildPositionOptions() {
   const select = $("result-position");
   if (!select) return;
