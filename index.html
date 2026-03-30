@@ -599,25 +599,33 @@ async function fetchRiderNews() {
   const allRiders = [...new Set(state.teams.flatMap(t => t.riders))];
 
   const feeds = [
-    "https://www.wielerflits.nl/feed/",
-    "https://www.cyclingnews.com/rss/",
+    { url: "https://www.wielerflits.nl/feed/", label: "Wielerflits" },
+    { url: "https://www.procyclingstats.com/news/rss", label: "PCS" },
+    { url: "https://www.velonews.com/feed/", label: "VeloNews" },
   ];
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
 
   let allItems = [];
 
-  for (const feedUrl of feeds) {
+  for (const feed of feeds) {
     try {
-      const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}&count=40`;
-      const res = await fetch(apiUrl);
-      const data = await res.json();
-      if (data.status === "ok" && data.items) {
-        allItems = allItems.concat(data.items.map(item => ({ ...item, source: data.feed.title })));
-      }
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(feed.url)}`;
+      const res = await fetch(proxyUrl);
+      const text = await res.text();
+      const xml = new DOMParser().parseFromString(text, "text/xml");
+      const items = [...xml.querySelectorAll("item")];
+
+      items.forEach(item => {
+        const title = item.querySelector("title")?.textContent || "";
+        const link = item.querySelector("link")?.textContent || "";
+        const pubDate = item.querySelector("pubDate")?.textContent || "";
+        const description = item.querySelector("description")?.textContent?.replace(/<[^>]*>/g, "") || "";
+
+        if (title && link) {
+          allItems.push({ title, link, pubDate, description, source: feed.label });
+        }
+      });
     } catch (e) {
-      console.warn("Feed mislukt:", feedUrl, e);
+      console.warn("Feed mislukt:", feed.url, e);
     }
   }
 
@@ -626,12 +634,10 @@ async function fetchRiderNews() {
     return;
   }
 
-  // Sorteer op datum, nieuwste eerst
   allItems.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
 
-  // Vind renners per artikel
   function findMatchingRiders(item) {
-    const text = `${item.title} ${item.description || ""}`;
+    const text = `${item.title} ${item.description}`;
     return allRiders.filter(rider => matchRiderInText(rider, text));
   }
 
@@ -639,21 +645,24 @@ async function fetchRiderNews() {
     const matchedRiders = findMatchingRiders(item);
     const isHighlight = matchedRiders.length > 0;
     const pubDate = new Date(item.pubDate);
-    const dateStr = pubDate.toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    const dateStr = isNaN(pubDate)
+      ? ""
+      : pubDate.toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
-    const riderTags = matchedRiders.map(r =>
-      `<span class="news-rider-tag">${escapeHtml(r)}</span>`
-    ).join("");
+    const riderTags = matchedRiders
+      .map(r => `<span class="news-rider-tag">${escapeHtml(r)}</span>`)
+      .join("");
 
     return `
       <div class="news-item ${isHighlight ? "highlight" : ""}">
         <a href="${escapeHtml(item.link)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>
-        <div class="news-meta">${escapeHtml(item.source)} · ${dateStr}</div>
+        <div class="news-meta">${escapeHtml(item.source)}${dateStr ? " · " + dateStr : ""}</div>
         ${riderTags ? `<div class="news-riders">${riderTags}</div>` : ""}
       </div>`;
   }).join("");
 
   container.innerHTML = html;
+}
 }
 function buildPositionOptions() {
   const select = $("result-position");
