@@ -896,9 +896,9 @@ function renderOverall() {
     return;
   }
 
-  tbody.innerHTML = ranking.map((item, index) => `
-    <tr>
-      <td style="font-weight:700">${index + 1}</td>
+tbody.innerHTML = ranking.map((item, index) => `
+    <tr class="crow" onclick="openParticipantDetail('${item.id}')">
+      <td style="font-weight:700">${index + 1}</td
       <td style="font-weight:500">${escapeHtml(item.displayName)}</td>
       <td style="color:var(--muted)">${item.teamCount}</td>
       <td><span class="pts">+${item.totalPoints}</span></td>
@@ -1561,7 +1561,56 @@ window.openRaceMatches = (raceId) => {
 
   openModal(`Starters: ${escapeHtml(race.name)}`, html);
 };
+window.openParticipantDetail = (uid) => {
+  const user = state.allUsers.find(u => u.id === uid);
+  const userName = user?.displayName || user?.email || "Deelnemer";
+  const teams = state.allTeams.filter(t => t.userId === uid);
 
+  if (!teams.length) {
+    openModal(escapeHtml(userName), '<div class="empty">Deze deelnemer heeft nog geen teams geïmporteerd.</div>');
+    return;
+  }
+
+  const totalAllTeams = teams.reduce((sum, team) => {
+    return sum + state.results
+      .filter(r => team.riders.some(rider => sameRiderName(rider, r.riderName)))
+      .reduce((s, r) => s + (r.points || 0), 0);
+  }, 0);
+
+  const teamsHtml = teams.map((team, index) => {
+    const cls = ["t1","t2","t3"][index % 3] || "t1";
+    const teamPts = state.results
+      .filter(r => team.riders.some(rider => sameRiderName(rider, r.riderName)))
+      .reduce((s, r) => s + (r.points || 0), 0);
+
+    const riderRows = team.riders.map(rider => {
+      const riderPts = state.results
+        .filter(r => sameRiderName(r.riderName, rider))
+        .reduce((s, r) => s + (r.points || 0), 0);
+      return `
+        <div class="rrow">
+          <span class="rname">${escapeHtml(rider)}</span>
+          ${riderPts ? `<span class="rpts">${riderPts}</span>` : `<span style="color:var(--muted);font-size:12px">—</span>`}
+        </div>`;
+    }).join("");
+
+    return `
+      <div class="card" style="margin-bottom:16px">
+        <div class="thead ${cls}">
+          <span>${escapeHtml(team.name)}</span>
+          <span class="tpts">${teamPts} pts</span>
+        </div>
+        <div class="team-meta">${team.riders.length} renners</div>
+        ${riderRows}
+      </div>`;
+  }).join("");
+
+  openModal(
+    `${escapeHtml(userName)} — ${totalAllTeams} pts`,
+    `<div style="display:flex;flex-direction:column;gap:4px">${teamsHtml}</div>`
+  );
+};
+  
 buildPositionOptions();
 
 onAuthStateChanged(auth, async (user) => {
